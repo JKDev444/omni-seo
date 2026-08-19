@@ -1,0 +1,197 @@
+// Omni SEO — Database Schema
+// Mirrors SEO_Operating_Tracker.xlsx (Audit Scorecard, Monthly Maintenance,
+// Citation Tracker, Client Report Log) + Exact_Audit_Methodology.md tiers/states.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum FindingStatus {
+  COMPLETED
+  ALREADY_COMPLETED
+  PENDING
+  NOT_CHANGED
+}
+
+enum PageType {
+  HOMEPAGE
+  SERVICE_PAGE
+  BLOG_ARTICLE
+  PRODUCT_PAGE
+  ABOUT_PAGE
+  CONTACT_PAGE
+  COLLECTION_PAGE
+  SEARCH_PAGE
+  OTHER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+}
+
+// One row per domain in scope (v1: omnicenters.com only)
+model Site {
+  id          String   @id @default(cuid())
+  domain      String   @unique
+  platform    String   @default("shopify") // shopify | wordpress | webflow | lovable | custom
+  createdAt   DateTime @default(now())
+
+  pages       Page[]
+  crawls      Crawl[]
+  citations   Citation[]
+  scorecard   ScorecardMetric[]
+  maintenance MaintenanceTask[]
+  reports     ClientReport[]
+}
+
+// Each scheduled/manual crawl run
+model Crawl {
+  id          String   @id @default(cuid())
+  siteId      String
+  site        Site     @relation(fields: [siteId], references: [id])
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  pagesFound  Int      @default(0)
+  status      String   @default("running") // running | completed | failed
+  findings    Finding[]
+}
+
+// One row per crawled URL
+model Page {
+  id            String    @id @default(cuid())
+  siteId        String
+  site          Site      @relation(fields: [siteId], references: [id])
+  url           String
+  pageType      PageType  @default(OTHER)
+  statusCode    Int?
+  title         String?
+  metaDesc      String?
+  canonical     String?
+  h1            String?
+  schemaTypes   String[]  @default([]) // e.g. ["LocalBusiness","BreadcrumbList"]
+  lastCrawledAt DateTime?
+  findings      Finding[]
+
+  @@unique([siteId, url])
+}
+
+// One row per issue detected — the core audit output.
+// Mirrors Exact_Audit_Methodology.md Step 9 output format exactly.
+model Finding {
+  id           String        @id @default(cuid())
+  crawlId      String
+  crawl        Crawl         @relation(fields: [crawlId], references: [id])
+  pageId       String?
+  page         Page?         @relation(fields: [pageId], references: [id])
+
+  category     String        // technical | local | content | schema | image | redirect
+  checkStep    String        // e.g. "Step 1 - Raw HTML", "Step 5 - Local SEO"
+  title        String        // short human-readable issue name
+  description  String        // why it matters
+  fixType      String?       // what to change
+  howToTest    String?       // how to confirm it cleared
+
+  priority     Priority
+  status       FindingStatus @default(PENDING)
+  owner        String?       // developer | content editor | local seo manager
+
+  isFalsePositive Boolean    @default(false) // Step 0.5 protocol result
+  detectedAt   DateTime      @default(now())
+  resolvedAt   DateTime?
+  notes        String?
+}
+
+// Mirrors the "Audit Scorecard" tab: baseline vs current vs target
+model ScorecardMetric {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id])
+  metric    String   // "Technical SEO score", "Indexed pages (GSC)", etc.
+  baseline  Float?
+  current   Float?
+  target    Float?
+  source    String?  // GSC | GA4 | crawler | manual
+  updatedAt DateTime @updatedAt
+}
+
+// Mirrors the "Citation Tracker" tab
+model Citation {
+  id             String   @id @default(cuid())
+  siteId         String
+  site           Site     @relation(fields: [siteId], references: [id])
+  directory      String   // "Google Business Profile", "Yelp", etc.
+  publicUrl      String?
+  napConsistent  Boolean?
+  indexed        Boolean?
+  lastCheckedAt  DateTime?
+  notes          String?
+}
+
+// Mirrors the "Monthly Maintenance" tab — Week 1-4 cadence
+model MaintenanceTask {
+  id            String    @id @default(cuid())
+  siteId        String
+  site          Site      @relation(fields: [siteId], references: [id])
+  week          Int       // 1-4
+  area          String    // Technical Crawl | Content + On-Page | Local SEO + Authority | Reporting
+  task          String
+  status        String    @default("not_started") // not_started | in_progress | done
+  owner         String?
+  completedAt   DateTime?
+  notes         String?
+}
+
+// Mirrors the "Client Report Log" tab
+model ClientReport {
+  id                   String   @id @default(cuid())
+  siteId               String
+  site                 Site     @relation(fields: [siteId], references: [id])
+  month                String   // "2026-08"
+  technicalHealth      String?
+  contentImprovements  String?
+  localSeo             String?
+  performance          String?
+  rankingsTraffic      String?
+  leadsConversions     String?
+  nextMonthPriorities  String?
+  createdAt            DateTime @default(now())
+}
+
+// Cached pulls from Google Search Console API
+model GscMetric {
+  id           String   @id @default(cuid())
+  date         DateTime
+  page         String?
+  query        String?
+  clicks       Int      @default(0)
+  impressions  Int      @default(0)
+  ctr          Float    @default(0)
+  position     Float    @default(0)
+  fetchedAt    DateTime @default(now())
+}
+
+// Cached pulls from GA4 Data API
+model Ga4Metric {
+  id          String   @id @default(cuid())
+  date        DateTime
+  page        String?
+  sessions    Int      @default(0)
+  conversions Int      @default(0)
+  source      String?
+  fetchedAt   DateTime @default(now())
+}
