@@ -3,6 +3,7 @@ import { HealthRing } from "@/components/HealthRing";
 import { FindingsList } from "@/components/FindingsList";
 import { ScorecardTable } from "@/components/ScorecardTable";
 import { CitationTracker } from "@/components/CitationTracker";
+import { MaintenanceTracker } from "@/components/MaintenanceTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,14 @@ export default async function DashboardPage() {
           <ScorecardTable rows={data.scorecard} />
           <CitationTracker rows={data.citations} />
         </div>
+      </div>
+
+      <div className="section">
+        <MaintenanceTracker
+          month={data.maintenance.month}
+          activeWeek={data.maintenance.activeWeek}
+          tasks={data.maintenance.tasks}
+        />
       </div>
     </div>
   );

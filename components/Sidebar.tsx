@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { href: "/dashboard#findings", label: "Findings" },
   { href: "/dashboard#scorecard", label: "Scorecard" },
   { href: "/dashboard#citations", label: "Citations" },
+  { href: "/dashboard#maintenance", label: "Maintenance" },
 ];
 
 export function Sidebar() {

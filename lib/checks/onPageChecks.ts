@@ -18,6 +18,7 @@ export interface RawFinding {
   fixType?: string;
   howToTest?: string;
   priority: Priority;
+  owner?: "developer" | "content editor" | "local seo manager";
 }
 
 interface PageContext {
@@ -28,14 +29,18 @@ interface PageContext {
   allTitlesOnSite: Map<string, string[]>; // title -> [urls] for duplicate detection
 }
 
-const EXPECTED_SCHEMA_BY_TYPE: Record<string, string[]> = {
-  homepage: ["Organization", "LocalBusiness", "WebSite", "BreadcrumbList"],
-  service_page: ["Service", "LocalBusiness", "BreadcrumbList"],
-  blog_article: ["BlogPosting", "Article", "BreadcrumbList"],
-  product_page: ["Product", "Offer"],
-  about_page: ["AboutPage", "Organization"],
-  contact_page: ["ContactPage", "LocalBusiness"],
-  collection_page: ["CollectionPage", "BreadcrumbList"],
+// Exact_Audit_Methodology.md Step 4's table uses "/" for interchangeable
+// schema types (e.g. "Organization/LocalBusiness", "BlogPosting/Article")
+// — either one satisfies that requirement, they're not both mandatory.
+// Each inner array here is one such alternatives group.
+const EXPECTED_SCHEMA_BY_TYPE: Record<string, string[][]> = {
+  homepage: [["Organization", "LocalBusiness"], ["WebSite"], ["BreadcrumbList"]],
+  service_page: [["Service"], ["LocalBusiness", "Organization"], ["BreadcrumbList"]],
+  blog_article: [["BlogPosting", "Article"], ["BreadcrumbList"]],
+  product_page: [["Product"], ["Offer"]],
+  about_page: [["AboutPage"], ["Organization", "LocalBusiness"]],
+  contact_page: [["ContactPage"], ["LocalBusiness"]],
+  collection_page: [["CollectionPage"], ["BreadcrumbList"]],
 };
 
 export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
@@ -175,15 +180,16 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
     }
   });
 
-  const expected = EXPECTED_SCHEMA_BY_TYPE[ctx.pageType] || [];
-  const missingSchema = expected.filter((t) => !schemaTypes.includes(t));
-  if (missingSchema.length > 0) {
+  const expectedGroups = EXPECTED_SCHEMA_BY_TYPE[ctx.pageType] || [];
+  const missingGroups = expectedGroups.filter((group) => !group.some((t) => schemaTypes.includes(t)));
+  if (missingGroups.length > 0) {
+    const expectedLabel = expectedGroups.map((g) => g.join("/")).join(", ");
     findings.push({
       category: "schema",
       checkStep: "Step 4 - Schema by page type",
       title: `Missing expected schema for ${ctx.pageType}`,
-      description: `Expected: ${expected.join(", ")}. Found: ${schemaTypes.join(", ") || "none"}.`,
-      fixType: `Add ${missingSchema.join(", ")} JSON-LD with stable @id values.`,
+      description: `Expected: ${expectedLabel}. Found: ${schemaTypes.join(", ") || "none"}.`,
+      fixType: `Add ${missingGroups.map((g) => g.join("/")).join(", ")} JSON-LD with stable @id values.`,
       priority: "MEDIUM",
     });
   }
@@ -238,8 +244,14 @@ export function runStep2_IndexabilityChecks(ctx: PageContext): RawFinding[] {
 }
 
 export function runAllChecks(ctx: PageContext): RawFinding[] {
+  // A non-2xx response (rate-limited, server error, etc.) usually means
+  // rawHtml is an error/challenge page, not the real page — running the
+  // content checks against it produces noise ("missing title/canonical/OG")
+  // that isn't a real finding about the page. Step 2 already reports the
+  // bad status itself, which is the actual issue.
+  const isSuccessResponse = ctx.statusCode >= 200 && ctx.statusCode < 300;
   return [
-    ...runStep1_RawHtmlChecks(ctx),
+    ...(isSuccessResponse ? runStep1_RawHtmlChecks(ctx) : []),
     ...runStep2_IndexabilityChecks(ctx),
   ];
 }

@@ -49,6 +49,8 @@ model Site {
   id          String   @id @default(cuid())
   domain      String   @unique
   platform    String   @default("shopify") // shopify | wordpress | webflow | lovable | custom
+  gbpPlaceId  String?  // Google Place ID, used to pull public GBP data via Places API
+  gbpUrl      String?  // public GBP listing URL, used as the citation entry + manual-entry fallback
   createdAt   DateTime @default(now())
 
   pages       Page[]
@@ -57,6 +59,7 @@ model Site {
   scorecard   ScorecardMetric[]
   maintenance MaintenanceTask[]
   reports     ClientReport[]
+  gbpProfile  GbpProfile?
 }
 
 // Each scheduled/manual crawl run
@@ -129,17 +132,44 @@ model ScorecardMetric {
   updatedAt DateTime @updatedAt
 }
 
-// Mirrors the "Citation Tracker" tab
+// Mirrors the "Citation Tracker" tab exactly: Directory / Profile, Public
+// URL, Login Owner, Date Created, NAP Consistent, Indexed, Last Checked,
+// Notes. Public URLs only — never store passwords/admin URLs here.
 model Citation {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   siteId         String
-  site           Site     @relation(fields: [siteId], references: [id])
-  directory      String   // "Google Business Profile", "Yelp", etc.
+  site           Site      @relation(fields: [siteId], references: [id])
+  directory      String    // "Google Business Profile", "Yelp", etc.
   publicUrl      String?
+  loginOwner     String?   // who holds/manages the login for this listing
+  dateCreated    DateTime? // when the citation/listing was created, not the DB row
   napConsistent  Boolean?
   indexed        Boolean?
   lastCheckedAt  DateTime?
   notes          String?
+}
+
+// Cached public-facing Google Business Profile data (Step 5 "GBP public
+// data pull"). One row per site, refreshed via Places API or manual entry
+// when no GBP manager access is available.
+model GbpProfile {
+  id              String   @id @default(cuid())
+  siteId          String   @unique
+  site            Site     @relation(fields: [siteId], references: [id])
+  placeId         String?
+  name            String?
+  primaryCategory String?
+  categories      String[] @default([])
+  address         String?
+  phone           String?
+  hours           Json?
+  appointmentLink String?
+  rating          Float?
+  reviewCount     Int?
+  photoCount      Int?
+  raw             Json?    // full API response, for fields not modeled above
+  source          String   @default("manual") // "places_api" | "manual"
+  fetchedAt       DateTime @default(now())
 }
 
 // Mirrors the "Monthly Maintenance" tab — Week 1-4 cadence
@@ -147,13 +177,16 @@ model MaintenanceTask {
   id            String    @id @default(cuid())
   siteId        String
   site          Site      @relation(fields: [siteId], references: [id])
+  month         String    // "2026-08" — one fresh task set per month, mirrors "duplicate this tab each month"
   week          Int       // 1-4
-  area          String    // Technical Crawl | Content + On-Page | Local SEO + Authority | Reporting
+  area          String    // Technical Crawl | Content + On-Page | Local SEO + Authority | Reporting + Planning
   task          String
   status        String    @default("not_started") // not_started | in_progress | done
   owner         String?
   completedAt   DateTime?
   notes         String?
+
+  @@unique([siteId, month, task])
 }
 
 // Mirrors the "Client Report Log" tab

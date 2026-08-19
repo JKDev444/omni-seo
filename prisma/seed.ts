@@ -1,9 +1,18 @@
 /**
  * Sample data so the dashboard is viewable before the crawler and GSC/GA4
  * integrations are wired up. Safe to re-run — upserts the site, replaces
- * its crawl/findings/scorecard/citations each time.
+ * its crawl/findings/scorecard each time. Citations and maintenance tasks
+ * use the real default-seeding functions (not hardcoded literals) so this
+ * script exercises the same code path production crawls/cron will use.
+ *
+ * All "sample data" below is clearly labeled as such in its notes field —
+ * none of it is a real NAP value, citation URL, or GBP status for
+ * omnicenters.com, per the audit methodology's rule to never fabricate
+ * data that hasn't actually been verified.
  */
 import { PrismaClient } from "@prisma/client";
+import { seedDefaultCitations } from "../lib/citations/defaults";
+import { seedMaintenanceMonth, monthKey } from "../lib/maintenance/seedMonth";
 
 const prisma = new PrismaClient();
 
@@ -19,6 +28,7 @@ async function main() {
   await prisma.page.deleteMany({ where: { siteId: site.id } });
   await prisma.scorecardMetric.deleteMany({ where: { siteId: site.id } });
   await prisma.citation.deleteMany({ where: { siteId: site.id } });
+  await prisma.maintenanceTask.deleteMany({ where: { siteId: site.id } });
 
   const pages = await Promise.all(
     [
@@ -67,10 +77,10 @@ async function main() {
         pageId: home.id,
         category: "local",
         checkStep: "Step 5 - Local SEO",
-        title: "NAP mismatch: footer vs. Google Business Profile",
-        description: "Footer lists suite \"120\"; GBP public listing lists suite \"110\". Inconsistent NAP hurts local pack ranking.",
+        title: "Address mismatch: footer vs. GBP public listing",
+        description: 'Sample finding — footer shows "...Suite 120..."; GBP public listing shows "...Suite 110...". Inconsistent NAP hurts local pack ranking. Classified High per the tier table, not Critical: it affects ranking/trust, it does not block crawling or indexing.',
         fixType: "Confirm the correct suite number and update whichever source is wrong.",
-        priority: "CRITICAL",
+        priority: "HIGH",
         owner: "local seo manager",
       },
       {
@@ -123,14 +133,21 @@ async function main() {
     ],
   });
 
-  await prisma.citation.createMany({
-    data: [
-      { siteId: site.id, directory: "Google Business Profile", publicUrl: "https://www.google.com/maps/place/Omni+Centers", napConsistent: false, indexed: true, lastCheckedAt: new Date() },
-      { siteId: site.id, directory: "Yelp", publicUrl: "https://www.yelp.com/biz/omni-centers-olympia", napConsistent: true, indexed: true, lastCheckedAt: new Date() },
-      { siteId: site.id, directory: "Bing Places", publicUrl: null, napConsistent: null, indexed: null, lastCheckedAt: null },
-      { siteId: site.id, directory: "Apple Maps", publicUrl: null, napConsistent: null, indexed: null, lastCheckedAt: null },
-    ],
+  // Real citation-defaults function — same 9-directory list a fresh site gets.
+  await seedDefaultCitations(site.id);
+  // Mark two as sample-checked so the dashboard demonstrates the states;
+  // everything else stays "unchecked," which is the honest starting state.
+  await prisma.citation.updateMany({
+    where: { siteId: site.id, directory: "Google Business Profile" },
+    data: { napConsistent: false, indexed: true, lastCheckedAt: new Date(), notes: "Sample data — not a live check." },
   });
+  await prisma.citation.updateMany({
+    where: { siteId: site.id, directory: "Yelp" },
+    data: { napConsistent: true, indexed: true, lastCheckedAt: new Date(), notes: "Sample data — not a live check." },
+  });
+
+  // Real maintenance-seeding function — same 19-task Week 1-4 set the SOP defines.
+  await seedMaintenanceMonth(site.id, monthKey());
 
   console.log(`Seeded ${site.domain} — crawl ${crawl.id} with ${pages.length} pages.`);
 }

@@ -9,3 +9,4 @@ out
 next-env.d.ts
 tsconfig.tsbuildinfo
 docs/
+.claude/scheduled_tasks.lock

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { Finding, Page, Priority } from "@prisma/client";
+import { getActiveMaintenanceWeek } from "@/lib/maintenance/seedMonth";
 
 export const V1_DOMAIN = "omnicenters.com";
 
@@ -19,6 +20,11 @@ export interface DashboardData {
   totalOpenFindings: number;
   scorecard: { metric: string; baseline: number | null; current: number | null; target: number | null; source: string | null }[];
   citations: { id: string; directory: string; publicUrl: string | null; napConsistent: boolean | null; indexed: boolean | null; lastCheckedAt: Date | null }[];
+  maintenance: {
+    month: string;
+    activeWeek: number;
+    tasks: { id: string; week: number; area: string; task: string; status: string; owner: string | null }[];
+  };
 }
 
 const PRIORITY_WEIGHT: Record<Priority, number> = {
@@ -63,6 +69,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     totalOpenFindings: 0,
     scorecard: [],
     citations: [],
+    maintenance: { month: "", activeWeek: 1, tasks: [] },
   };
 
   if (!site) return empty;
@@ -83,6 +90,12 @@ export async function getDashboardData(): Promise<DashboardData> {
     prisma.scorecardMetric.findMany({ where: { siteId: site.id }, orderBy: { metric: "asc" } }),
     prisma.citation.findMany({ where: { siteId: site.id }, orderBy: { directory: "asc" } }),
   ]);
+
+  const { month, week: activeWeek } = await getActiveMaintenanceWeek(site.id);
+  const maintenanceTasks = await prisma.maintenanceTask.findMany({
+    where: { siteId: site.id, month },
+    orderBy: [{ week: "asc" }, { id: "asc" }],
+  });
 
   const openFindings = allFindings.filter(isOpen);
 
@@ -140,5 +153,17 @@ export async function getDashboardData(): Promise<DashboardData> {
       indexed: c.indexed,
       lastCheckedAt: c.lastCheckedAt,
     })),
+    maintenance: {
+      month,
+      activeWeek,
+      tasks: maintenanceTasks.map((t) => ({
+        id: t.id,
+        week: t.week,
+        area: t.area,
+        task: t.task,
+        status: t.status,
+        owner: t.owner,
+      })),
+    },
   };
 }
