@@ -85,6 +85,7 @@ model Site {
   gscMetrics  GscMetric[]
   ga4Metrics  Ga4Metric[]
   urlInspections UrlInspection[]
+  coreWebVitals  CoreWebVitals[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -325,4 +326,31 @@ model UrlInspection {
   fetchedAt         DateTime  @default(now())
 
   @@unique([siteId, url])
+}
+
+// Core Web Vitals — CrUX (real-user field data, the metric that actually
+// matters for ranking) and PageSpeed Insights (Lighthouse lab diagnostics
+// on top of the same CrUX data) are deliberately separate rows via
+// `source`, not merged into one shape — they answer different questions
+// ("how do real users experience this" vs. "what does a lab audit say to
+// fix"). Confirmed the Search Console API has no CWV endpoint at all.
+model CoreWebVitals {
+  id                String    @id @default(cuid())
+  siteId            String
+  site              Site      @relation(fields: [siteId], references: [id])
+  url               String    // the crawled page URL, or the site origin for origin-level CrUX data
+  formFactor        String    // PHONE | DESKTOP
+  source            String    // CRUX_FIELD | PSI_LAB
+  lcpMs             Float?
+  inpMs             Float?
+  cls               Float?
+  lcpRating         String?   // good | needs-improvement | poor
+  inpRating         String?
+  clsRating         String?
+  performanceScore  Int?      // PSI Lighthouse score, 0-100 — lab only
+  topOpportunities  Json?     // PSI Lighthouse audit opportunities — lab only
+  isOriginFallback  Boolean   @default(false) // true if per-URL CrUX had no data and this is origin-level instead
+  fetchedAt         DateTime  @default(now())
+
+  @@unique([siteId, url, formFactor, source])
 }
