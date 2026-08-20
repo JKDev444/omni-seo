@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { href: "/analytics", label: "Analytics" },
   { href: "/indexation", label: "Indexation" },
   { href: "/performance", label: "Performance" },
+  { href: "/internal-links", label: "Internal Links" },
   { href: "/dashboard#findings", label: "Findings" },
   { href: "/dashboard#scorecard", label: "Scorecard" },
   { href: "/dashboard#citations", label: "Citations" },

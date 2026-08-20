@@ -86,6 +86,7 @@ model Site {
   ga4Metrics  Ga4Metric[]
   urlInspections UrlInspection[]
   coreWebVitals  CoreWebVitals[]
+  internalLinks  InternalLink[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -102,6 +103,7 @@ model Crawl {
   status      String   @default("running") // running | completed | failed
   findings    Finding[]
   snapshots   PageSnapshot[]
+  internalLinks InternalLink[]
 }
 
 // One row per crawled URL
@@ -353,4 +355,25 @@ model CoreWebVitals {
   fetchedAt         DateTime  @default(now())
 
   @@unique([siteId, url, formFactor, source])
+}
+
+// One row per internal link found on a crawled page (raw HTML, same
+// domain only — external links aren't tracked here). Kept per-crawl
+// (not deduped across crawls) so link-graph analysis always reflects
+// the latest crawl's actual state, and so link changes over time are
+// visible later without a separate history mechanism.
+model InternalLink {
+  id           String   @id @default(cuid())
+  crawlId      String
+  crawl        Crawl    @relation(fields: [crawlId], references: [id])
+  siteId       String
+  site         Site     @relation(fields: [siteId], references: [id])
+  sourceUrl    String
+  targetUrl    String   // resolved absolute URL, normalized (no hash fragment)
+  anchorText   String?
+  isContextual Boolean  @default(true) // false = inside <nav>/<header>/<footer>
+  createdAt    DateTime @default(now())
+
+  @@index([crawlId])
+  @@index([siteId, targetUrl])
 }

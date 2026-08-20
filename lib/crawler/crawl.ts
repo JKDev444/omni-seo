@@ -24,6 +24,8 @@ import {
 import { withRenderer } from "./render";
 import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
 import { createFindingRecord } from "../findings/createFinding";
+import { extractInternalLinks } from "./extractLinks";
+import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
 
 const prisma = new PrismaClient();
 
@@ -247,7 +249,8 @@ export async function crawlSite(siteId: string, domain: string) {
     // Second pass: run checks now that we have sitewide title/meta data for
     // duplicate detection
     let totalFindings = 0;
-    let homepage: { pageId: string; html: string } | null = null;
+    let homepage: { pageId: string; html: string; url: string } | null = null;
+    const allLinks: { sourceUrl: string; targetUrl: string; anchorText: string | null; isContextual: boolean }[] = [];
     const urlToPageId = new Map<string, string>();
     const pagesWithCanonicals: { url: string; canonical: string }[] = [];
 
@@ -291,11 +294,17 @@ export async function crawlSite(siteId: string, domain: string) {
         });
       }
 
-      if (pageType === "homepage") homepage = { pageId: page.id, html };
+      if (pageType === "homepage") homepage = { pageId: page.id, html, url };
       urlToPageId.set(url, page.id);
 
       const canonical = $('link[rel="canonical"]').attr("href")?.trim();
       if (canonical) pagesWithCanonicals.push({ url, canonical });
+
+      if (html) {
+        for (const link of extractInternalLinks(html, url)) {
+          allLinks.push({ sourceUrl: url, ...link });
+        }
+      }
 
       const findings: RawFinding[] = runAllChecks({
         url,
@@ -328,6 +337,27 @@ export async function crawlSite(siteId: string, domain: string) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
       totalFindings++;
+    }
+
+    // Internal Link Graph — bulk-store every link found this crawl, then
+    // analyze orphans/depth/authority/under-linked money pages. Needs the
+    // full link set and page list, so it runs once after the main loop.
+    if (allLinks.length > 0) {
+      await prisma.internalLink.createMany({
+        data: allLinks.map((l) => ({ crawlId: crawl.id, siteId, ...l })),
+      });
+    }
+    if (homepage) {
+      const { stats } = analyzeLinkGraph({
+        homepageUrl: homepage.url,
+        pages: pageResults.map((p) => ({ url: p.url, pageType: p.pageType })),
+        links: allLinks,
+      });
+      for (const { url, finding } of runInternalLinkFindings(stats)) {
+        const pageId = urlToPageId.get(url) ?? null;
+        await createFindingRecord(crawl.id, pageId, finding);
+        totalFindings++;
+      }
     }
 
     // Sitewide Step 5 Local SEO check — NAP consistency across footer,
