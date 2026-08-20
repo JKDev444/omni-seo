@@ -2,6 +2,19 @@ import { prisma } from "@/lib/db";
 import { V1_DOMAIN } from "@/lib/data/dashboard";
 import { detectCannibalization, detectContentDecay, detectCtrOpportunities, type CannibalizationIssue, type ContentDecayIssue, type CtrOpportunity } from "@/lib/data/keywordAnalysis";
 
+export interface CtrRewriteRow {
+  url: string;
+  query: string;
+  impressions: number;
+  ctr: number;
+  avgPosition: number;
+  currentTitle: string | null;
+  currentMetaDesc: string | null;
+  suggestedTitle: string;
+  suggestedMetaDesc: string;
+  rationale: string;
+}
+
 export interface KeywordRow {
   id: string;
   phrase: string;
@@ -20,11 +33,12 @@ export interface KeywordsPageData {
   cannibalization: CannibalizationIssue[];
   decay: ContentDecayIssue[];
   ctrOpportunities: CtrOpportunity[];
+  ctrRewrites: CtrRewriteRow[];
 }
 
 export async function getKeywordsPageData(): Promise<KeywordsPageData> {
   const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
-  if (!site) return { site: null, keywords: [], cannibalization: [], decay: [], ctrOpportunities: [] };
+  if (!site) return { site: null, keywords: [], cannibalization: [], decay: [], ctrOpportunities: [], ctrRewrites: [] };
 
   const keywords = await prisma.keyword.findMany({
     where: { siteId: site.id, active: true },
@@ -32,10 +46,11 @@ export async function getKeywordsPageData(): Promise<KeywordsPageData> {
     orderBy: { phrase: "asc" },
   });
 
-  const [cannibalization, decay, ctrOpportunities] = await Promise.all([
+  const [cannibalization, decay, ctrOpportunities, ctrRewrites] = await Promise.all([
     detectCannibalization(site.id),
     detectContentDecay(site.id),
     detectCtrOpportunities(site.id),
+    prisma.ctrRewriteSuggestion.findMany({ where: { siteId: site.id }, orderBy: { impressions: "desc" } }),
   ]);
 
   return {
@@ -54,5 +69,17 @@ export async function getKeywordsPageData(): Promise<KeywordsPageData> {
     cannibalization,
     decay,
     ctrOpportunities,
+    ctrRewrites: ctrRewrites.map((r) => ({
+      url: r.url,
+      query: r.query,
+      impressions: r.impressions,
+      ctr: r.ctr,
+      avgPosition: r.avgPosition,
+      currentTitle: r.currentTitle,
+      currentMetaDesc: r.currentMetaDesc,
+      suggestedTitle: r.suggestedTitle,
+      suggestedMetaDesc: r.suggestedMetaDesc,
+      rationale: r.rationale,
+    })),
   };
 }

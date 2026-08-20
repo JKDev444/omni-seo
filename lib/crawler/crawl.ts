@@ -157,9 +157,20 @@ async function fetchSitemapUrls(origin: string): Promise<string[]> {
     const $ = cheerio.load(xml, { xmlMode: true });
     const urls: string[] = [];
     $("loc").each((_, el) => { urls.push($(el).text().trim()); });
-    // Handle sitemap index files (one level deep)
-    const subSitemaps = urls.filter((u) => u.endsWith(".xml"));
-    const directUrls = urls.filter((u) => !u.endsWith(".xml"));
+    // Handle sitemap index files (one level deep). Check the pathname, not
+    // the raw URL string — Shopify's dynamic sub-sitemaps (e.g. the pages
+    // sitemap) carry a query string like "?from=...&to=...", so a naive
+    // u.endsWith(".xml") misses them entirely and silently drops every
+    // page inside that sub-sitemap from discovery.
+    const isXmlSitemap = (u: string) => {
+      try {
+        return new URL(u).pathname.endsWith(".xml");
+      } catch {
+        return false;
+      }
+    };
+    const subSitemaps = urls.filter(isXmlSitemap);
+    const directUrls = urls.filter((u) => !isXmlSitemap(u));
     for (const sub of subSitemaps.slice(0, 10)) {
       try {
         const subRes = await fetch(sub, { headers: { "User-Agent": USER_AGENT } });

@@ -174,6 +174,42 @@ export default async function KeywordsPage() {
         </div>
       )}
 
+      {data.ctrRewrites.length > 0 && (
+        <div className="section card">
+          <h2 className="card-title">Suggested title/meta rewrites</h2>
+          {data.ctrRewrites.map((r) => (
+            <div key={r.url} style={{ marginBottom: "var(--space-5)", paddingBottom: "var(--space-4)", borderBottom: "1px solid var(--color-border)" }}>
+              <strong>{pathFromUrl(r.url)}</strong>{" "}
+              <span style={{ color: "var(--color-ink-muted)", fontSize: "var(--text-sm)" }}>
+                — &quot;{r.query}&quot;, {r.impressions} impressions, {r.ctr}% CTR at position {r.avgPosition}
+              </span>
+              <table className="table" style={{ marginTop: "var(--space-2)" }}>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Title</th>
+                    <th>Meta description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Current</td>
+                    <td>{r.currentTitle ?? "(none)"}</td>
+                    <td>{r.currentMetaDesc ?? "(none)"}</td>
+                  </tr>
+                  <tr>
+                    <td>Suggested</td>
+                    <td>{r.suggestedTitle}</td>
+                    <td>{r.suggestedMetaDesc}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginTop: "var(--space-2)" }}>{r.rationale}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {data.ctrOpportunities.length > 0 && (
         <div className="section card">
           <h2 className="card-title">CTR opportunities — underperforming their position</h2>

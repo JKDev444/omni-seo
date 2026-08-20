@@ -91,6 +91,8 @@ model Site {
   internalLinks  InternalLink[]
   contentAnalyses ContentAnalysis[]
   keywords    Keyword[]
+  ctrRewriteSuggestions CtrRewriteSuggestion[]
+  contentStacks ContentStack[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -127,6 +129,8 @@ model Page {
   findings      Finding[]
   snapshots     PageSnapshot[]
   contentAnalyses ContentAnalysis[]
+  ctrRewriteSuggestions CtrRewriteSuggestion[]
+  contentStackMemberships ContentStackMember[]
 
   @@unique([siteId, url])
 }
@@ -405,6 +409,68 @@ model ContentAnalysis {
   ctaConsistencyScore Int?
   issues              Json?    // [{ dimension, score, issue }]
   fetchedAt           DateTime @default(now())
+
+  @@unique([siteId, url])
+}
+
+enum ContentStackRole {
+  PILLAR
+  SERVICE_PAGE
+  SUPPORTING_ARTICLE
+}
+
+// A topical content cluster (e.g. "CoolSculpting", "Botox", "Weight Loss")
+// — pillar + service pages + supporting blog articles, mirroring the
+// content-stack framework already used for this site's real content
+// planning. Membership is LLM-clustered from crawled titles/H1s/pageType
+// (cheap: one batch call over all pages, not per-page) since inferring
+// ~20+ service groupings from raw crawl data isn't reliably rule-based.
+model ContentStack {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id])
+  topic     String
+  createdAt DateTime @default(now())
+
+  members ContentStackMember[]
+
+  @@unique([siteId, topic])
+}
+
+model ContentStackMember {
+  id             String           @id @default(cuid())
+  contentStackId String
+  contentStack   ContentStack     @relation(fields: [contentStackId], references: [id])
+  pageId         String
+  page           Page             @relation(fields: [pageId], references: [id])
+  url            String
+  role           ContentStackRole
+
+  @@unique([contentStackId, pageId])
+}
+
+// LLM-generated title/meta rewrite suggestions for CTR-opportunity pages
+// (high impressions, good position, underperforming CTR — see
+// lib/data/keywordAnalysis.ts's detectCtrOpportunities). Cached per URL
+// since generation is a real per-page API cost; regenerated only when
+// explicitly re-run, not on every page load.
+model CtrRewriteSuggestion {
+  id                  String   @id @default(cuid())
+  siteId              String
+  site                Site     @relation(fields: [siteId], references: [id])
+  pageId              String
+  page                Page     @relation(fields: [pageId], references: [id])
+  url                 String
+  query               String
+  impressions         Int
+  ctr                 Float
+  avgPosition         Float
+  currentTitle        String?
+  currentMetaDesc     String?
+  suggestedTitle      String
+  suggestedMetaDesc   String
+  rationale           String
+  generatedAt         DateTime @default(now())
 
   @@unique([siteId, url])
 }
