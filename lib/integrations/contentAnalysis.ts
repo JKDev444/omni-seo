@@ -18,9 +18,17 @@ const DEFAULT_MAX_PAGES = 20;
 export async function pullContentAnalysis(
   siteId: string,
   maxPages = DEFAULT_MAX_PAGES
-): Promise<{ ok: boolean; analyzed: number; skippedUnchanged: number; errors: number; findingsCreated: number; message?: string }> {
+): Promise<{
+  ok: boolean;
+  analyzed: number;
+  skippedUnchanged: number;
+  errors: number;
+  errorDetails: { url: string; reason: string; message: string }[];
+  findingsCreated: number;
+  message?: string;
+}> {
   const latestCrawl = await prisma.crawl.findFirst({ where: { siteId, status: "completed" }, orderBy: { startedAt: "desc" } });
-  if (!latestCrawl) return { ok: true, analyzed: 0, skippedUnchanged: 0, errors: 0, findingsCreated: 0, message: "No completed crawl yet." };
+  if (!latestCrawl) return { ok: true, analyzed: 0, skippedUnchanged: 0, errors: 0, errorDetails: [], findingsCreated: 0, message: "No completed crawl yet." };
 
   const snapshots = await prisma.pageSnapshot.findMany({
     where: { crawlId: latestCrawl.id, page: { pageType: { in: REVIEWABLE_TYPES } } },
@@ -32,6 +40,7 @@ export async function pullContentAnalysis(
   let skippedUnchanged = 0;
   let errors = 0;
   let findingsCreated = 0;
+  const errorDetails: { url: string; reason: string; message: string }[] = [];
 
   for (const snap of snapshots) {
     const existing = await prisma.contentAnalysis.findUnique({ where: { siteId_url: { siteId, url: snap.page.url } } });
@@ -45,9 +54,10 @@ export async function pullContentAnalysis(
 
     if (!result.ok) {
       if (result.reason === "missing_api_key") {
-        return { ok: false, analyzed, skippedUnchanged, errors, findingsCreated, message: result.message };
+        return { ok: false, analyzed, skippedUnchanged, errors, errorDetails, findingsCreated, message: result.message };
       }
       errors++;
+      errorDetails.push({ url: snap.page.url, reason: result.reason, message: result.message });
       continue;
     }
 
@@ -87,5 +97,5 @@ export async function pullContentAnalysis(
     }
   }
 
-  return { ok: true, analyzed, skippedUnchanged, errors, findingsCreated };
+  return { ok: true, analyzed, skippedUnchanged, errors, errorDetails, findingsCreated };
 }

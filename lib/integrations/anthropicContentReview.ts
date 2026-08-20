@@ -6,9 +6,9 @@
  * since the last analysis (see contentAnalysis.ts's hash check).
  */
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-haiku-4-5-20251001";
+export const MODEL = "claude-haiku-4-5-20251001";
 
-const RUBRIC_SYSTEM_PROMPT = `You are auditing a single page's on-page content quality for a local medical aesthetics/wellness business, against this exact rubric (from the site's audit methodology):
+export const RUBRIC_SYSTEM_PROMPT = `You are auditing a single page's on-page content quality for a local medical aesthetics/wellness business, against this exact rubric (from the site's audit methodology):
 
 - headingIntent: does the H1 and surrounding content clearly match what someone searching for this page's topic actually wants? Flag vague, generic, or mismatched headings.
 - introQuality: do the first 100-200 words answer who/what/where/why and include a clear call to action?
@@ -17,7 +17,7 @@ const RUBRIC_SYSTEM_PROMPT = `You are auditing a single page's on-page content q
 - freshness: any signs of outdated pricing, stale dates, expired promotions, or retired service mentions?
 - ctaConsistency: is there a clear, consistent call to action (book/call/contact)?
 
-Score each dimension 0-100. If a dimension scores below 70, include a one-sentence "issue" explaining specifically what's missing or wrong — be concrete, not generic ("no mention of aftercare or recovery time" not "content could be better"). If 70 or above, issue is null.
+Score each dimension 0-100. If a dimension scores below 70, include a SHORT "issue" (under 25 words) explaining specifically what's missing or wrong — be concrete, not generic ("no mention of aftercare or recovery time" not "content could be better"). If 70 or above, issue is null. Keep every issue brief — you have limited output space across 6 dimensions.
 
 Respond with ONLY valid JSON, no markdown fences, no commentary, exactly this shape:
 {"headingIntent":{"score":N,"issue":"..."|null},"introQuality":{"score":N,"issue":"..."|null},"entityCoverage":{"score":N,"issue":"..."|null},"trustSignals":{"score":N,"issue":"..."|null},"freshness":{"score":N,"issue":"..."|null},"ctaConsistency":{"score":N,"issue":"..."|null}}`;
@@ -62,7 +62,10 @@ export async function reviewPageContent(
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 800,
+        // 800, then 1500, both proved insufficient headroom against real
+        // pages — some responses still got cut off mid-JSON even after the
+        // first increase.
+        max_tokens: 2000,
         temperature: 0,
         system: RUBRIC_SYSTEM_PROMPT,
         messages: [
