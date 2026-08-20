@@ -22,8 +22,10 @@ export async function pullGa4Metrics(siteId: string, days = 90): Promise<Ga4Pull
   const analyticsdata = google.analyticsdata({ version: "v1beta", auth: authResult.auth });
 
   try {
+    const propertyResource = site.ga4PropertyId.startsWith("properties/") ? site.ga4PropertyId : `properties/${site.ga4PropertyId}`;
+
     const res = await analyticsdata.properties.runReport({
-      property: site.ga4PropertyId,
+      property: propertyResource,
       requestBody: {
         dateRanges: [{ startDate: `${days}daysAgo`, endDate: "today" }],
         dimensions: [

@@ -94,18 +94,32 @@ export async function getAnalyticsData(): Promise<AnalyticsData> {
     .sort((a, b) => b.clicks - a.clicks)
     .slice(0, 10);
 
+  // GA4's page field is already a path (/pages/specials); GSC's is a full
+  // URL (https://omnicenters.com/pages/specials) — normalize both to path
+  // form so sessions and clicks join on the same page instead of silently
+  // never matching.
+  const toPath = (page: string): string => {
+    try {
+      return new URL(page).pathname || "/";
+    } catch {
+      return page;
+    }
+  };
+
   const pageTotals = new Map<string, { sessions: number; clicks: number }>();
   for (const r of ga4Rows) {
     if (!r.page) continue;
-    const e = pageTotals.get(r.page) ?? { sessions: 0, clicks: 0 };
+    const key = toPath(r.page);
+    const e = pageTotals.get(key) ?? { sessions: 0, clicks: 0 };
     e.sessions += r.sessions;
-    pageTotals.set(r.page, e);
+    pageTotals.set(key, e);
   }
   for (const r of gscRows) {
     if (!r.page) continue;
-    const e = pageTotals.get(r.page) ?? { sessions: 0, clicks: 0 };
+    const key = toPath(r.page);
+    const e = pageTotals.get(key) ?? { sessions: 0, clicks: 0 };
     e.clicks += r.clicks;
-    pageTotals.set(r.page, e);
+    pageTotals.set(key, e);
   }
   const topPages = [...pageTotals.entries()]
     .map(([page, v]) => ({ page, ...v }))

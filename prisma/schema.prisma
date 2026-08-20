@@ -73,6 +73,8 @@ model Site {
   platform    String   @default("shopify") // shopify | wordpress | webflow | lovable | custom
   gbpPlaceId  String?  // Google Place ID, used to pull public GBP data via Places API
   gbpUrl      String?  // public GBP listing URL, used as the citation entry + manual-entry fallback
+  dataForSeoLocationCode Int?    // DataForSEO location_code for SERP targeting (e.g. Olympia-Tumwater metro)
+  dataForSeoLanguageCode String? @default("en")
   createdAt   DateTime @default(now())
 
   pages       Page[]
@@ -88,6 +90,7 @@ model Site {
   coreWebVitals  CoreWebVitals[]
   internalLinks  InternalLink[]
   contentAnalyses ContentAnalysis[]
+  keywords    Keyword[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -404,4 +407,42 @@ model ContentAnalysis {
   fetchedAt           DateTime @default(now())
 
   @@unique([siteId, url])
+}
+
+// A target keyword to track rank for. targetUrl is the page we intend
+// to rank for this term — used for cannibalization detection (another
+// owned URL ranking for the same query in GSC data) and to judge
+// whether a ranking page matches intent.
+model Keyword {
+  id           String   @id @default(cuid())
+  siteId       String
+  site         Site     @relation(fields: [siteId], references: [id])
+  phrase       String
+  targetUrl    String?
+  source       String   @default("manual") // manual | gsc_suggested
+  searchVolume Int?
+  cpc          Float?
+  difficulty   Int?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  rankings     KeywordRanking[]
+
+  @@unique([siteId, phrase])
+}
+
+// One row per rank-check. Kept as a full history (not just latest) so
+// position trends can be charted over time, same pattern as GscMetric.
+model KeywordRanking {
+  id            String   @id @default(cuid())
+  keywordId     String
+  keyword       Keyword  @relation(fields: [keywordId], references: [id])
+  checkedAt     DateTime @default(now())
+  position      Int?     // null = not found in top results checked
+  rankingUrl    String?  // which of our URLs actually ranked (may differ from Keyword.targetUrl)
+  localPack     Boolean  @default(false) // true if we appeared in the local 3-pack
+  aiOverview    Boolean  @default(false) // true if an AI Overview was present in the SERP at all
+  serpFeatures  Json?    // raw list of SERP feature types present (featured_snippet, sitelinks, etc.)
+
+  @@index([keywordId, checkedAt])
 }
