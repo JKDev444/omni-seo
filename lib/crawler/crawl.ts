@@ -14,7 +14,15 @@ import { PrismaClient } from "@prisma/client";
 import { runAllChecks, type RawFinding } from "../checks/onPageChecks";
 import { runLocalSeoChecks } from "../localSeo/runLocalSeoAudit";
 import { runRenderComparisonChecks } from "../checks/renderComparisonChecks";
+import {
+  runRedirectChainChecks,
+  runXRobotsTagCheck,
+  runDuplicateMetaDescriptionCheck,
+  runThinContentCheck,
+  runCanonicalConsistencyCheck,
+} from "../checks/technicalSeoChecks";
 import { withRenderer } from "./render";
+import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
 
 const prisma = new PrismaClient();
 
@@ -213,31 +221,28 @@ export async function crawlSite(siteId: string, domain: string) {
       .slice(0, MAX_PAGES);
 
     const allTitlesOnSite = new Map<string, string[]>();
-    const pageResults: { url: string; html: string; renderedHtml: string | null; status: number; pageType: string }[] = [];
+    const allMetaDescsOnSite = new Map<string, string[]>();
+    const pageResults: {
+      url: string;
+      html: string;
+      renderedHtml: string | null;
+      status: number;
+      pageType: string;
+      fetchResult: FetchResult;
+    }[] = [];
 
-    // First pass: fetch all pages (raw HTML) and render each one (rendered
-    // DOM) through a single shared headless-browser instance. A delay
-    // between requests plus retries with growing backoff on 429/503 keeps
-    // a same-domain, 50-200 page crawl from tripping the target's own rate
-    // limiter and getting back error pages that would otherwise look like
-    // real findings.
-    const RETRY_BACKOFFS_MS = [3000, 6000, 12000];
+    // First pass: fetch all pages (following redirects manually so the
+    // chain is visible, not hidden by fetch()'s auto-follow) and render
+    // each one (rendered DOM) through a single shared headless-browser
+    // instance. A delay between requests keeps a same-domain, 50-200 page
+    // crawl from tripping the target's own rate limiter and getting back
+    // error pages that would otherwise look like real findings.
     await withRenderer(async (renderPage) => {
       for (const url of urls) {
-        let html = "";
-        let status = 0;
-        try {
-          let res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-          for (const fallbackBackoffMs of RETRY_BACKOFFS_MS) {
-            if (res.status !== 429 && res.status !== 503) break;
-            const retryAfterHeader = Number(res.headers.get("retry-after"));
-            const backoffMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : fallbackBackoffMs;
-            await new Promise((r) => setTimeout(r, backoffMs));
-            res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-          }
-          html = await res.text();
-          status = res.status;
+        const fetchResult = await fetchWithRedirects(url);
+        const { html, finalStatus: status } = fetchResult;
 
+        if (html) {
           const $ = cheerio.load(html);
           const title = $("title").first().text().trim();
           if (title) {
@@ -245,20 +250,28 @@ export async function crawlSite(siteId: string, domain: string) {
             existing.push(url);
             allTitlesOnSite.set(title, existing);
           }
-        } catch {
-          // pageResults still gets a row below, with empty html/status 0
+          const metaDesc = $('meta[name="description"]').attr("content")?.trim();
+          if (metaDesc) {
+            const existing = allMetaDescsOnSite.get(metaDesc) || [];
+            existing.push(url);
+            allMetaDescsOnSite.set(metaDesc, existing);
+          }
         }
 
         const renderedHtml = status >= 200 && status < 300 ? await renderPage(url) : null;
-        pageResults.push({ url, html, renderedHtml, status, pageType: classifyPageType(url) });
+        pageResults.push({ url, html, renderedHtml, status, pageType: classifyPageType(url), fetchResult });
         await new Promise((r) => setTimeout(r, 350));
       }
     });
 
-    // Second pass: run checks now that we have sitewide title data for duplicate detection
+    // Second pass: run checks now that we have sitewide title/meta data for
+    // duplicate detection
     let totalFindings = 0;
     let homepage: { pageId: string; html: string } | null = null;
-    for (const { url, html, renderedHtml, status, pageType } of pageResults) {
+    const urlToPageId = new Map<string, string>();
+    const pagesWithCanonicals: { url: string; canonical: string }[] = [];
+
+    for (const { url, html, renderedHtml, status, pageType, fetchResult } of pageResults) {
       const $ = cheerio.load(html);
       const page = await prisma.page.upsert({
         where: { siteId_url: { siteId, url } },
@@ -299,6 +312,10 @@ export async function crawlSite(siteId: string, domain: string) {
       }
 
       if (pageType === "homepage") homepage = { pageId: page.id, html };
+      urlToPageId.set(url, page.id);
+
+      const canonical = $('link[rel="canonical"]').attr("href")?.trim();
+      if (canonical) pagesWithCanonicals.push({ url, canonical });
 
       const findings: RawFinding[] = runAllChecks({
         url,
@@ -308,6 +325,13 @@ export async function crawlSite(siteId: string, domain: string) {
         allTitlesOnSite,
       });
 
+      findings.push(...runRedirectChainChecks(url, fetchResult));
+      findings.push(...runXRobotsTagCheck(url, fetchResult.xRobotsTag));
+      if (html) {
+        const metaDesc = $('meta[name="description"]').attr("content")?.trim() ?? null;
+        findings.push(...runDuplicateMetaDescriptionCheck(url, metaDesc, allMetaDescsOnSite));
+        findings.push(...runThinContentCheck(url, html, pageType));
+      }
       if (renderedHtml) {
         findings.push(...runRenderComparisonChecks(html, renderedHtml));
       }
@@ -316,6 +340,14 @@ export async function crawlSite(siteId: string, domain: string) {
         await createFindingRecord(crawl.id, page.id, f);
         totalFindings++;
       }
+    }
+
+    // Sitewide canonical URL pattern consistency (protocol/www) — needs
+    // every page's canonical before it can tell what the dominant pattern is.
+    for (const { url, finding } of runCanonicalConsistencyCheck(pagesWithCanonicals)) {
+      const pageId = urlToPageId.get(url) ?? null;
+      await createFindingRecord(crawl.id, pageId, finding);
+      totalFindings++;
     }
 
     // Sitewide Step 5 Local SEO check — NAP consistency across footer,
