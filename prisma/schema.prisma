@@ -84,6 +84,7 @@ model Site {
   gbpProfile  GbpProfile?
   gscMetrics  GscMetric[]
   ga4Metrics  Ga4Metric[]
+  urlInspections UrlInspection[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -301,4 +302,27 @@ model Ga4Metric {
   fetchedAt      DateTime @default(now())
 
   @@index([siteId, date])
+}
+
+// Cached pulls from the Search Console URL Inspection API — what Google
+// actually says about each URL, correlated (in lib/data/indexation.ts)
+// against what our own crawler concluded for the same URL. coverageState
+// is Google's own display string (no fixed enum contract), so it's kept
+// as free text; normalizedStatus is our own derived bucket for counts.
+model UrlInspection {
+  id                String    @id @default(cuid())
+  siteId            String
+  site              Site      @relation(fields: [siteId], references: [id])
+  url               String
+  normalizedStatus  String    // Indexed | Not Indexed | Blocked | Discovered - Not Indexed | Crawled - Not Indexed | Canonical Mismatch
+  verdict           String?   // PASS | PARTIAL | FAIL | NEUTRAL
+  coverageState     String?   // Google's own display string, e.g. "Submitted and indexed"
+  robotsTxtState    String?   // ALLOWED | DISALLOWED
+  indexingState     String?   // INDEXING_ALLOWED | BLOCKED_BY_META_TAG | ...
+  googleCanonical   String?
+  userCanonical     String?
+  lastCrawlTime     DateTime?
+  fetchedAt         DateTime  @default(now())
+
+  @@unique([siteId, url])
 }
