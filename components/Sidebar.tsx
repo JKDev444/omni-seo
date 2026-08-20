@@ -8,7 +8,13 @@ const NAV_ITEMS = [
   { href: "/dashboard#maintenance", label: "Maintenance" },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  userEmail,
+  signOutAction,
+}: {
+  userEmail: string | null;
+  signOutAction: () => Promise<void>;
+}) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -26,6 +32,14 @@ export function Sidebar() {
         <strong>{V1_DOMAIN}</strong>
         Shopify · Ella 3.0
       </div>
+      {userEmail && (
+        <form action={signOutAction} className="sidebar-account">
+          <span className="sidebar-account-email">{userEmail}</span>
+          <button type="submit" className="sidebar-signout-btn">
+            Sign out
+          </button>
+        </form>
+      )}
     </aside>
   );
 }

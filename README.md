@@ -7,21 +7,29 @@ methodology in the SEO_System reference docs.
 ## Stack
 Next.js (App Router) → GitHub → Vercel (hosting + Cron) → Neon Postgres → NextAuth
 
-## What's built so far (v1 foundation)
+## What's built so far
 - `prisma/schema.prisma` — full data model (Sites, Pages, Crawls, Findings,
-  Scorecard, Citations, Maintenance Tasks, Client Reports, GSC/GA4 cache)
-- `lib/checks/onPageChecks.ts` — Steps 1-4 audit logic (raw HTML, indexability,
-  schema-by-page-type) straight from Exact_Audit_Methodology.md
-- `lib/crawler/crawl.ts` — the crawler itself: robots.txt respect, sitemap
-  discovery, raw HTML fetch, duplicate-title detection across the whole site
+  Scorecard, Citations, Maintenance Tasks, Client Reports, GSC/GA4 cache,
+  GBP profile cache)
+- `lib/checks/onPageChecks.ts` — Steps 1, 2, 4 audit logic (raw HTML,
+  indexability, schema-by-page-type) straight from Exact_Audit_Methodology.md
+- `lib/crawler/crawl.ts` — the crawler: robots.txt respect (properly scoped
+  by User-agent), sitemap discovery, rate-limit-safe fetching with retry/
+  backoff, duplicate-title detection across the whole site
+- `lib/localSeo/` — Step 5 NAP consistency check (footer vs. schema vs. GBP)
+- `lib/integrations/places.ts` — GBP public data pull via Places API
+- `lib/citations/`, `lib/maintenance/` — Citation Tracker and Monthly
+  Maintenance defaults, sourced exactly from docs/SEO_System/
+- `app/(app)/dashboard/` — dashboard UI (health rings, findings, scorecard,
+  citation tracker, maintenance tracker)
+- `auth.ts`, `middleware.ts`, `app/login/` — NextAuth login, Google
+  provider, deny-by-default allowlist via `ALLOWED_EMAILS`
 - `styles/tokens.css` — design system (brand-anchored palette, type scale)
 
 ## What's next
-- Dashboard UI (site health rings, findings list, scorecard, citation tracker)
-- GSC + GA4 API integration (`lib/integrations/gsc.ts`, `ga4.ts`)
-- Local SEO module (NAP consistency, GBP public data)
-- NextAuth login
-- Vercel Cron config for scheduled crawls
+See the phased roadmap (Phases 2-7: content depth, image/CWV, platform/
+e-commerce checks, GSC+GA4+GBP live data, guided roadmap & reporting,
+automation) — ask Claude for the current phase status.
 
 ---
 
