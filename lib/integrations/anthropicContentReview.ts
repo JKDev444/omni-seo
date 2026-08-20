@@ -41,6 +41,41 @@ export function extractJson(text: string): string {
   return (fenced ? fenced[1] : text).trim();
 }
 
+/**
+ * The model reliably drops the final closing brace right before the
+ * markdown fence when it wraps output in one, even though stop_reason
+ * reports end_turn (a normal completion, not a token-budget cutoff) —
+ * confirmed across multiple real failures where the JSON was short
+ * exactly one "}" at the very end. A string-aware brace counter (so a
+ * literal "{" inside an issue string doesn't throw off the count) closes
+ * the gap rather than discarding an otherwise-complete, valid response.
+ */
+export function repairUnbalancedBraces(json: string): string {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const ch of json) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") depth--;
+  }
+
+  return depth > 0 ? json + "}".repeat(depth) : json;
+}
+
 export async function reviewPageContent(
   url: string,
   pageType: string,
@@ -62,9 +97,6 @@ export async function reviewPageContent(
       },
       body: JSON.stringify({
         model: MODEL,
-        // 800, then 1500, both proved insufficient headroom against real
-        // pages — some responses still got cut off mid-JSON even after the
-        // first increase.
         max_tokens: 2000,
         temperature: 0,
         system: RUBRIC_SYSTEM_PROMPT,
@@ -75,6 +107,7 @@ export async function reviewPageContent(
           },
         ],
       }),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {
@@ -89,7 +122,27 @@ export async function reviewPageContent(
       const scores = JSON.parse(extractJson(text)) as ContentReviewScores;
       return { ok: true, scores };
     } catch {
-      return { ok: false, reason: "parse_error", message: `Could not parse model response as JSON: ${text.slice(0, 200)}` };
+      // Confirmed root cause across multiple real failures: the model
+      // reliably drops the final closing brace right before the markdown
+      // fence, even with stop_reason: end_turn (a normal completion, not
+      // a token-budget cutoff) — so try repairing before giving up.
+      try {
+        const repaired = repairUnbalancedBraces(extractJson(text));
+        const scores = JSON.parse(repaired) as ContentReviewScores;
+        return { ok: true, scores };
+      } catch {
+        // fall through to the detailed parse_error below
+      }
+      // stop_reason and the full text (not a truncated preview) are the
+      // difference between "the model genuinely got cut off" and "the
+      // model wrote something that isn't valid JSON" — a short display
+      // slice here previously masked a real, well-formed response and
+      // sent the max_tokens investigation in the wrong direction.
+      return {
+        ok: false,
+        reason: "parse_error",
+        message: `stop_reason=${json.stop_reason ?? "unknown"}, output_tokens=${json.usage?.output_tokens ?? "?"}. Full text: ${text}`,
+      };
     }
   } catch (err) {
     return { ok: false, reason: "api_error", message: err instanceof Error ? err.message : String(err) };

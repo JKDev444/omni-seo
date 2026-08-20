@@ -10,9 +10,10 @@ const prisma = new PrismaClient();
 
 async function main() {
   const domain = process.argv[2] ?? "omnicenters.com";
+  const maxPages = process.argv[3] ? Number(process.argv[3]) : undefined;
   const site = await prisma.site.findUniqueOrThrow({ where: { domain } });
 
-  const result = await pullContentAnalysis(site.id);
+  const result = maxPages ? await pullContentAnalysis(site.id, maxPages) : await pullContentAnalysis(site.id);
   console.log(result);
 }
 
