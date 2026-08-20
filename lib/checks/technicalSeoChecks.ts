@@ -7,6 +7,7 @@
 import * as cheerio from "cheerio";
 import type { RawFinding } from "./onPageChecks";
 import type { FetchResult } from "../crawler/fetchWithRedirects";
+import { extractVisibleText } from "./contentDepthChecks";
 
 export function runRedirectChainChecks(startUrl: string, result: FetchResult): RawFinding[] {
   const findings: RawFinding[] = [];
@@ -111,9 +112,7 @@ export function runThinContentCheck(url: string, rawHtml: string, pageType: stri
   // Utility/system page types aren't expected to carry much body copy.
   if (pageType === "contact_page" || pageType === "collection_page") return [];
 
-  const $ = cheerio.load(rawHtml);
-  $("script, style, nav, footer, header").remove();
-  const text = $("body").text().replace(/\s+/g, " ").trim();
+  const text = extractVisibleText(rawHtml);
   const wordCount = text ? text.split(" ").length : 0;
 
   if (wordCount < THIN_CONTENT_WORD_THRESHOLD) {

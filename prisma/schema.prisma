@@ -87,6 +87,7 @@ model Site {
   urlInspections UrlInspection[]
   coreWebVitals  CoreWebVitals[]
   internalLinks  InternalLink[]
+  contentAnalyses ContentAnalysis[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -122,6 +123,7 @@ model Page {
   lastCrawledAt DateTime?
   findings      Finding[]
   snapshots     PageSnapshot[]
+  contentAnalyses ContentAnalysis[]
 
   @@unique([siteId, url])
 }
@@ -376,4 +378,30 @@ model InternalLink {
 
   @@index([crawlId])
   @@index([siteId, targetUrl])
+}
+
+// LLM-assisted content quality scoring (Step 3 — heading/intent match,
+// intro quality, entity coverage, trust/E-E-A-T signals, freshness, CTA
+// consistency). contentHash lets a re-run skip pages whose content
+// hasn't changed since the last analysis, since each analysis is a real
+// API call with a real (small) cost, unlike every other check in this
+// project which is free/deterministic.
+model ContentAnalysis {
+  id                  String   @id @default(cuid())
+  siteId              String
+  site                Site     @relation(fields: [siteId], references: [id])
+  pageId              String
+  page                Page     @relation(fields: [pageId], references: [id])
+  url                 String
+  contentHash         String
+  headingIntentScore  Int?
+  introQualityScore   Int?
+  entityCoverageScore Int?
+  trustSignalsScore   Int?
+  freshnessScore      Int?
+  ctaConsistencyScore Int?
+  issues              Json?    // [{ dimension, score, issue }]
+  fetchedAt           DateTime @default(now())
+
+  @@unique([siteId, url])
 }

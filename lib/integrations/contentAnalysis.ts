@@ -1,0 +1,91 @@
+import { PageType } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { reviewPageContent } from "./anthropicContentReview";
+import { extractVisibleText, runContentDepthChecks } from "@/lib/checks/contentDepthChecks";
+import { createFindingRecord } from "@/lib/findings/createFinding";
+
+// Content-heavy page types worth the per-page LLM cost; utility pages
+// (contact, search, collection listings) aren't worth reviewing this way.
+const REVIEWABLE_TYPES: PageType[] = [
+  PageType.SERVICE_PAGE,
+  PageType.PRODUCT_PAGE,
+  PageType.BLOG_ARTICLE,
+  PageType.HOMEPAGE,
+  PageType.ABOUT_PAGE,
+];
+const DEFAULT_MAX_PAGES = 20;
+
+export async function pullContentAnalysis(
+  siteId: string,
+  maxPages = DEFAULT_MAX_PAGES
+): Promise<{ ok: boolean; analyzed: number; skippedUnchanged: number; errors: number; findingsCreated: number; message?: string }> {
+  const latestCrawl = await prisma.crawl.findFirst({ where: { siteId, status: "completed" }, orderBy: { startedAt: "desc" } });
+  if (!latestCrawl) return { ok: true, analyzed: 0, skippedUnchanged: 0, errors: 0, findingsCreated: 0, message: "No completed crawl yet." };
+
+  const snapshots = await prisma.pageSnapshot.findMany({
+    where: { crawlId: latestCrawl.id, page: { pageType: { in: REVIEWABLE_TYPES } } },
+    include: { page: true },
+    take: maxPages,
+  });
+
+  let analyzed = 0;
+  let skippedUnchanged = 0;
+  let errors = 0;
+  let findingsCreated = 0;
+
+  for (const snap of snapshots) {
+    const existing = await prisma.contentAnalysis.findUnique({ where: { siteId_url: { siteId, url: snap.page.url } } });
+    if (existing && existing.contentHash === snap.rawHtmlHash) {
+      skippedUnchanged++;
+      continue;
+    }
+
+    const visibleText = extractVisibleText(snap.rawHtml);
+    const result = await reviewPageContent(snap.page.url, snap.page.pageType, snap.page.h1, visibleText);
+
+    if (!result.ok) {
+      if (result.reason === "missing_api_key") {
+        return { ok: false, analyzed, skippedUnchanged, errors, findingsCreated, message: result.message };
+      }
+      errors++;
+      continue;
+    }
+
+    const s = result.scores;
+    await prisma.contentAnalysis.upsert({
+      where: { siteId_url: { siteId, url: snap.page.url } },
+      update: {
+        contentHash: snap.rawHtmlHash,
+        headingIntentScore: s.headingIntent.score,
+        introQualityScore: s.introQuality.score,
+        entityCoverageScore: s.entityCoverage.score,
+        trustSignalsScore: s.trustSignals.score,
+        freshnessScore: s.freshness.score,
+        ctaConsistencyScore: s.ctaConsistency.score,
+        issues: JSON.parse(JSON.stringify(s)),
+        fetchedAt: new Date(),
+      },
+      create: {
+        siteId,
+        pageId: snap.pageId,
+        url: snap.page.url,
+        contentHash: snap.rawHtmlHash,
+        headingIntentScore: s.headingIntent.score,
+        introQualityScore: s.introQuality.score,
+        entityCoverageScore: s.entityCoverage.score,
+        trustSignalsScore: s.trustSignals.score,
+        freshnessScore: s.freshness.score,
+        ctaConsistencyScore: s.ctaConsistency.score,
+        issues: JSON.parse(JSON.stringify(s)),
+      },
+    });
+    analyzed++;
+
+    for (const finding of runContentDepthChecks(s)) {
+      await createFindingRecord(latestCrawl.id, snap.pageId, finding);
+      findingsCreated++;
+    }
+  }
+
+  return { ok: true, analyzed, skippedUnchanged, errors, findingsCreated };
+}
