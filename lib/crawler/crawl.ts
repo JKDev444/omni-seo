@@ -23,29 +23,9 @@ import {
 } from "../checks/technicalSeoChecks";
 import { withRenderer } from "./render";
 import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
+import { createFindingRecord } from "../findings/createFinding";
 
 const prisma = new PrismaClient();
-
-async function createFindingRecord(crawlId: string, pageId: string | null, f: RawFinding) {
-  await prisma.finding.create({
-    data: {
-      crawlId,
-      pageId,
-      category: f.category,
-      checkStep: f.checkStep,
-      title: f.title,
-      description: f.description,
-      fixType: f.fixType,
-      howToTest: f.howToTest,
-      priority: f.priority,
-      owner: f.owner,
-      confidence: f.confidence ?? 100,
-      fixLocation: f.fixLocation,
-      source: f.source ?? "RAW_HTML",
-      status: "PENDING",
-    },
-  });
-}
 
 const USER_AGENT = "OmniSEOBot/1.0 (+internal audit tool for omnicenters.com)";
 const MAX_PAGES = 200; // safety ceiling for v1 (single domain)
