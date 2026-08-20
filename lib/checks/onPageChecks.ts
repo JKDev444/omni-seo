@@ -10,6 +10,8 @@ import * as cheerio from "cheerio";
 
 export type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
+export type FindingSource = "RAW_HTML" | "RENDERED_DOM" | "BOTH";
+
 export interface RawFinding {
   category: "technical" | "local" | "content" | "schema" | "image" | "redirect";
   checkStep: string;
@@ -19,6 +21,12 @@ export interface RawFinding {
   howToTest?: string;
   priority: Priority;
   owner?: "developer" | "content editor" | "local seo manager";
+  /** 0-100. Defaults to 100 (deterministic check) if omitted. */
+  confidence?: number;
+  /** Where to actually make the fix, e.g. "Theme Liquid", "Shopify Admin > Page". */
+  fixLocation?: string;
+  /** Defaults to RAW_HTML if omitted — set explicitly for rendered-DOM-derived findings. */
+  source?: FindingSource;
 }
 
 interface PageContext {
@@ -58,6 +66,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       fixType: "Add a unique, descriptive <title> (50-60 chars) server-rendered in <head>.",
       howToTest: "View page source (Ctrl+U) and confirm exactly one <title> tag is present.",
       priority: "CRITICAL",
+      fixLocation: "Theme Liquid",
     });
   } else if (titles.length > 1) {
     findings.push({
@@ -68,6 +77,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       fixType: "Remove the duplicate injection point (check theme.liquid vs. installed SEO apps).",
       howToTest: "View page source and confirm exactly one <title> tag.",
       priority: "HIGH",
+      fixLocation: "Theme Liquid",
     });
   } else {
     const titleText = titles.first().text().trim();
@@ -81,6 +91,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
         fixType: "Write a unique title per page reflecting that page's specific intent.",
         howToTest: "Re-crawl and confirm no two URLs share a title.",
         priority: "HIGH",
+        fixLocation: "Shopify Admin > Page",
       });
     }
   }
@@ -96,6 +107,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       fixType: "Add a unique 140-160 character meta description server-rendered in <head>.",
       howToTest: "View page source and confirm the tag is present with content.",
       priority: "MEDIUM",
+      fixLocation: "Theme Liquid",
     });
   } else if (metaDesc.length > 1) {
     findings.push({
@@ -104,6 +116,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       title: "Duplicate meta description tags",
       description: "Multiple meta description tags in raw HTML — likely theme + app conflict.",
       priority: "HIGH",
+      fixLocation: "Theme Liquid",
     });
   }
 
@@ -117,6 +130,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       description: "No H1 found in raw HTML. If one appears visually, it's being injected client-side, which search engines may not credit.",
       fixType: "Add a hardcoded H1 matching page intent, server-rendered.",
       priority: "HIGH",
+      fixLocation: "Theme Liquid",
     });
   } else if (h1s.length > 1) {
     findings.push({
@@ -125,6 +139,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       title: "Multiple H1 tags",
       description: `${h1s.length} H1 tags found. Should be exactly one per page.`,
       priority: "MEDIUM",
+      fixLocation: "Theme Liquid",
     });
   }
 
@@ -137,6 +152,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       title: "Missing canonical tag",
       description: "No canonical tag present — risk of duplicate content being split across URL variants (http/https, www/non-www, trailing slash).",
       priority: "HIGH",
+      fixLocation: "Theme Liquid",
     });
   } else if (canonical.length > 1) {
     findings.push({
@@ -145,6 +161,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       title: "Multiple canonical tags",
       description: "Conflicting canonical signals — search engines may ignore both.",
       priority: "HIGH",
+      fixLocation: "Theme Liquid",
     });
   }
 
@@ -158,6 +175,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       title: "Incomplete Open Graph tags",
       description: `Missing: ${missingOg.join(", ")}. Affects how the page appears when shared on social platforms.`,
       priority: "LOW",
+      fixLocation: "Theme Liquid",
     });
   }
 
@@ -176,6 +194,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
         title: "Invalid JSON-LD syntax",
         description: "A schema block failed to parse as valid JSON — it will be ignored by search engines entirely.",
         priority: "HIGH",
+        fixLocation: "Theme Liquid",
       });
     }
   });
@@ -191,6 +210,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
       description: `Expected: ${expectedLabel}. Found: ${schemaTypes.join(", ") || "none"}.`,
       fixType: `Add ${missingGroups.map((g) => g.join("/")).join(", ")} JSON-LD with stable @id values.`,
       priority: "MEDIUM",
+      fixLocation: "Theme Liquid",
     });
   }
 
@@ -208,6 +228,7 @@ export function runStep1_RawHtmlChecks(ctx: PageContext): RawFinding[] {
         description: `${type} schema appears ${count} times — likely theme + app both injecting it.`,
         fixType: "Remove one source; keep a single authoritative block per type.",
         priority: "MEDIUM",
+        fixLocation: "Theme Liquid",
       });
     }
   });
@@ -237,6 +258,7 @@ export function runStep2_IndexabilityChecks(ctx: PageContext): RawFinding[] {
       title: "Page is noindex",
       description: "This page is set to noindex. Confirm this is intentional — a page meant to rank should not carry this tag.",
       priority: "CRITICAL",
+      fixLocation: "Theme Liquid",
     });
   }
 

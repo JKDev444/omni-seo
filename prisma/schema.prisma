@@ -19,10 +19,29 @@ enum Priority {
 }
 
 enum FindingStatus {
+  PENDING
+  IN_PROGRESS
   COMPLETED
   ALREADY_COMPLETED
-  PENDING
+  VERIFIED           // fix confirmed on a later re-crawl
   NOT_CHANGED
+  IGNORED            // acknowledged, deliberately not acting on it
+  FALSE_POSITIVE      // Step 0.5 protocol: not a real issue
+  ACCEPTED            // known tradeoff, won't fix
+  THIRD_PARTY         // caused by an app/widget outside our control
+  PLATFORM_CONTROLLED // caused by the platform (Shopify default behavior etc.)
+  REQUIRES_ADMIN      // blocked on CMS/hosting/DNS access
+  REQUIRES_CONTENT    // blocked on a content editor
+  REQUIRES_DEVELOPER  // blocked on a developer
+}
+
+// Where a finding's evidence came from — server response vs. what a
+// browser actually renders after JS runs. A mismatch here (e.g. an H1
+// present in rendered but not raw HTML) is itself often the finding.
+enum FindingSource {
+  RAW_HTML
+  RENDERED_DOM
+  BOTH
 }
 
 enum PageType {
@@ -75,6 +94,7 @@ model Crawl {
   pagesFound  Int      @default(0)
   status      String   @default("running") // running | completed | failed
   findings    Finding[]
+  snapshots   PageSnapshot[]
 }
 
 // One row per crawled URL
@@ -92,8 +112,28 @@ model Page {
   schemaTypes   String[]  @default([]) // e.g. ["LocalBusiness","BreadcrumbList"]
   lastCrawledAt DateTime?
   findings      Finding[]
+  snapshots     PageSnapshot[]
 
   @@unique([siteId, url])
+}
+
+// One row per (crawl, page) — the actual HTML evidence, kept historically
+// so later crawls can diff against it (regression detection, "47 pages
+// lost their meta description after a theme update"). rawHtmlHash allows
+// cheap change-detection without loading full text for every comparison.
+model PageSnapshot {
+  id           String   @id @default(cuid())
+  crawlId      String
+  crawl        Crawl    @relation(fields: [crawlId], references: [id])
+  pageId       String
+  page         Page     @relation(fields: [pageId], references: [id])
+  rawHtml      String
+  rawHtmlHash  String
+  renderedHtml String?  // null if rendering wasn't available for this crawl
+  createdAt    DateTime @default(now())
+
+  @@unique([crawlId, pageId])
+  @@index([pageId])
 }
 
 // One row per issue detected — the core audit output.
@@ -115,6 +155,17 @@ model Finding {
   priority     Priority
   status       FindingStatus @default(PENDING)
   owner        String?       // developer | content editor | local seo manager
+
+  // How sure the check is (0-100). Deterministic checks (missing tag,
+  // wrong status code) are 100. Heuristic ones (content quality, E-E-A-T)
+  // should self-report lower so they're never treated as equally certain
+  // as a hard technical failure.
+  confidence   Int           @default(100)
+  // Where to actually make the fix: "Theme Liquid", "Shopify Admin > Page",
+  // "Shopify Admin > Redirects", "GBP", "Third-party app", "DNS", "GSC",
+  // "Content rewrite" — free text, not an enum, since exact locations vary.
+  fixLocation  String?
+  source       FindingSource @default(RAW_HTML)
 
   isFalsePositive Boolean    @default(false) // Step 0.5 protocol result
   detectedAt   DateTime      @default(now())
