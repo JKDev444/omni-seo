@@ -82,6 +82,11 @@ model Site {
   maintenance MaintenanceTask[]
   reports     ClientReport[]
   gbpProfile  GbpProfile?
+  gscMetrics  GscMetric[]
+  ga4Metrics  Ga4Metric[]
+
+  gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
+  ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
 }
 
 // Each scheduled/manual crawl run
@@ -259,26 +264,41 @@ model ClientReport {
   createdAt            DateTime @default(now())
 }
 
-// Cached pulls from Google Search Console API
+// Cached pulls from Google Search Console API (Search Analytics query
+// endpoint — the only performance data GSC's API actually exposes).
 model GscMetric {
   id           String   @id @default(cuid())
+  siteId       String
+  site         Site     @relation(fields: [siteId], references: [id])
   date         DateTime
   page         String?
   query        String?
+  device       String?  // DESKTOP | MOBILE | TABLET
+  country      String?
   clicks       Int      @default(0)
   impressions  Int      @default(0)
   ctr          Float    @default(0)
   position     Float    @default(0)
   fetchedAt    DateTime @default(now())
+
+  @@index([siteId, date])
 }
 
 // Cached pulls from GA4 Data API
 model Ga4Metric {
-  id          String   @id @default(cuid())
-  date        DateTime
-  page        String?
-  sessions    Int      @default(0)
-  conversions Int      @default(0)
-  source      String?
-  fetchedAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  siteId         String
+  site           Site     @relation(fields: [siteId], references: [id])
+  date           DateTime
+  page           String?
+  sessions       Int      @default(0)
+  users          Int      @default(0)
+  engagedSessions Int     @default(0)
+  conversions    Int      @default(0)
+  channelGroup   String?  // Organic Search | Direct | Referral | Paid Search | etc.
+  deviceCategory String?  // desktop | mobile | tablet
+  source         String?
+  fetchedAt      DateTime @default(now())
+
+  @@index([siteId, date])
 }
