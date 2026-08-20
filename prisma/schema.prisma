@@ -37,11 +37,14 @@ enum PageType {
   OTHER
 }
 
+// Internal login only — no public signup route exists, so this table
+// itself is the allowlist. Accounts are created via scripts/createUser.ts.
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
 }
 
 // One row per domain in scope (v1: omnicenters.com only)

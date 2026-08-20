@@ -22,8 +22,12 @@ Next.js (App Router) → GitHub → Vercel (hosting + Cron) → Neon Postgres �
   Maintenance defaults, sourced exactly from docs/SEO_System/
 - `app/(app)/dashboard/` — dashboard UI (health rings, findings, scorecard,
   citation tracker, maintenance tracker)
-- `auth.ts`, `middleware.ts`, `app/login/` — NextAuth login, Google
-  provider, deny-by-default allowlist via `ALLOWED_EMAILS`
+- `auth.ts`, `auth.config.ts`, `middleware.ts`, `app/login/` — NextAuth
+  username/password login (Credentials provider). No public signup route —
+  `scripts/createUser.ts` is the only way to create an account, so the
+  `User` table is the allowlist. `auth.config.ts` is a deliberately
+  Prisma-free config shared with `middleware.ts`, since Vercel's Edge
+  Runtime (where middleware runs) can't run Prisma Client.
 - `styles/tokens.css` — design system (brand-anchored palette, type scale)
 
 ## What's next
@@ -44,19 +48,22 @@ automation) — ask Claude for the current phase status.
 - neon.tech → New Project → copy the connection string
 - This becomes your `DATABASE_URL` environment variable
 
-### 3. Create a Google Cloud project (for GSC + GA4 access)
-- console.cloud.google.com → New Project → name it "Omni SEO Tool"
-- Enable APIs: **Search Console API** and **Google Analytics Data API**
-- Create OAuth 2.0 credentials (OAuth client ID, type: Web application)
-  - Authorized redirect URI: `https://your-vercel-domain.vercel.app/api/auth/callback/google`
-- Save the Client ID and Client Secret — these become environment variables,
-  never committed to the repo
-
-### 4. Create a Vercel account and connect the GitHub repo
+### 3. Create a Vercel account and connect the GitHub repo
 - vercel.com → Import Project → select the `omni-seo` repo
-- Add environment variables: `DATABASE_URL`, `GOOGLE_CLIENT_ID`,
-  `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`
-- Deploy
+- Add environment variables: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+- Deploy, then create a login account: `npx tsx scripts/createUser.ts <email> <password>`
+  (run locally against the production `DATABASE_URL`, or via `vercel exec` —
+  there's no signup UI on purpose)
+
+### 4. Google Cloud (only needed later, for GSC/GA4/GBP data — not login)
+- console.cloud.google.com → New Project → name it "Omni SEO Tool"
+- Enable APIs as each integration phase needs them: **Search Console API**,
+  **Google Analytics Data API**, **Places API (New)**
+- GSC + GA4 will use a **service account** (no OAuth consent screen needed —
+  add the service account's email as a user on the Search Console property
+  and the GA4 property directly)
+- GBP (Business Profile API) needs a one-time OAuth grant from whoever
+  manages the actual listing, and separate Google approval for API access
 
 ### 5. Point a subdomain (optional, e.g. seo.omnicenters.com)
 - In wherever your DNS is managed, add a CNAME record pointing to
@@ -71,15 +78,14 @@ automation) — ask Claude for the current phase status.
 ## Local development
 ```bash
 npm install
-npm run db:push      # sync Prisma schema to your Neon database
-npm run dev           # starts local server at localhost:3000
+npm run db:push                                        # sync Prisma schema to your database
+npx tsx scripts/createUser.ts you@example.com password  # create a login account
+npm run dev                                             # starts local server at localhost:3000
 ```
 
 ## Environment variables needed
 ```
 DATABASE_URL=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 ```

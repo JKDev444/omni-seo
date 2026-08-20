@@ -1,46 +1,39 @@
 /**
- * Internal login only — not public signup. Google is the identity
- * provider, but signing in with Google alone isn't enough: the signIn
- * callback below checks the email against ALLOWED_EMAILS. If that env
- * var isn't set, access is denied by default (fail closed), not opened
- * to anyone with a Google account.
+ * Full auth config, used by the /api/auth route handler and server
+ * actions (both run in the Node.js runtime, not Edge — safe for Prisma).
+ * middleware.ts deliberately does NOT import this file — see
+ * auth.config.ts for why.
+ *
+ * Internal login only — username/password, no public signup route. The
+ * User table itself is the allowlist: only accounts created via
+ * scripts/createUser.ts can log in. No Google dependency for login —
+ * Google (service accounts / a one-time GBP connect flow) is only used
+ * later for pulling GSC/GA4/GBP data, decoupled from how staff sign in.
  */
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-
-function allowedEmails(): string[] {
-  return (process.env.ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
+import Credentials from "next-auth/providers/credentials";
+import { prisma } from "@/lib/db";
+import { verifyPassword } from "@/lib/auth/password";
+import { authConfig } from "./auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // Explicit names rather than NextAuth v5's AUTH_GOOGLE_ID/AUTH_GOOGLE_SECRET
-  // auto-inference, to match the GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET vars
-  // already set up in Vercel. For the secret specifically, fall back to
-  // AUTH_SECRET (v5's own default name) in case that's what ends up set —
-  // an explicit `secret: undefined` here would otherwise override v5's own
-  // auto-inference and turn a recoverable misconfiguration into a hard fail.
-  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
-  trustHost: true, // Vercel sits behind a proxy; needed to avoid UntrustedHost errors
+  ...authConfig,
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      authorize: async (credentials) => {
+        const email = String(credentials?.email ?? "").trim().toLowerCase();
+        const password = String(credentials?.password ?? "");
+        if (!email || !password) return null;
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user || !verifyPassword(password, user.passwordHash)) return null;
+
+        return { id: user.id, email: user.email, name: user.name ?? undefined };
+      },
     }),
   ],
-  pages: {
-    signIn: "/login",
-  },
-  callbacks: {
-    async signIn({ user }) {
-      const allowed = allowedEmails();
-      if (allowed.length === 0) return false; // unconfigured — deny, don't default-open
-      return !!user.email && allowed.includes(user.email.toLowerCase());
-    },
-    async session({ session }) {
-      return session;
-    },
-  },
 });

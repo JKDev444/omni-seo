@@ -1,5 +1,10 @@
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import { authConfig } from "./auth.config";
+
+// Uses the Edge-safe config only — no Prisma import reaches this file,
+// directly or transitively. See auth.config.ts for why that matters.
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
