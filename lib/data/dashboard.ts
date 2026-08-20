@@ -45,12 +45,27 @@ const RING_CATEGORY_MAP: Record<string, "Technical" | "Local" | "Content"> = {
   content: "Content",
 };
 
+// Statuses that mean the finding is resolved, dismissed, or confirmed not
+// real — everything else (including "blocked on X" statuses) is still an
+// open problem and should keep counting against the score.
+const CLOSED_STATUSES = new Set([
+  "COMPLETED",
+  "ALREADY_COMPLETED",
+  "VERIFIED",
+  "IGNORED",
+  "FALSE_POSITIVE",
+  "ACCEPTED",
+]);
+
 function isOpen(f: Finding): boolean {
-  return !f.isFalsePositive && (f.status === "PENDING" || f.status === "NOT_CHANGED");
+  return !f.isFalsePositive && !CLOSED_STATUSES.has(f.status);
 }
 
 function scoreForFindings(findings: Finding[]): number {
-  const penalty = findings.reduce((sum, f) => sum + PRIORITY_WEIGHT[f.priority], 0);
+  // Weight by confidence too — a heuristic finding self-reporting 60%
+  // confidence shouldn't tank the score as hard as a deterministic one
+  // reporting 100%.
+  const penalty = findings.reduce((sum, f) => sum + PRIORITY_WEIGHT[f.priority] * (f.confidence / 100), 0);
   return Math.max(0, Math.round(100 - penalty));
 }
 

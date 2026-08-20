@@ -9,11 +9,35 @@
  */
 
 import * as cheerio from "cheerio";
+import { createHash } from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { runAllChecks, type RawFinding } from "../checks/onPageChecks";
 import { runLocalSeoChecks } from "../localSeo/runLocalSeoAudit";
+import { runRenderComparisonChecks } from "../checks/renderComparisonChecks";
+import { withRenderer } from "./render";
 
 const prisma = new PrismaClient();
+
+async function createFindingRecord(crawlId: string, pageId: string | null, f: RawFinding) {
+  await prisma.finding.create({
+    data: {
+      crawlId,
+      pageId,
+      category: f.category,
+      checkStep: f.checkStep,
+      title: f.title,
+      description: f.description,
+      fixType: f.fixType,
+      howToTest: f.howToTest,
+      priority: f.priority,
+      owner: f.owner,
+      confidence: f.confidence ?? 100,
+      fixLocation: f.fixLocation,
+      source: f.source ?? "RAW_HTML",
+      status: "PENDING",
+    },
+  });
+}
 
 const USER_AGENT = "OmniSEOBot/1.0 (+internal audit tool for omnicenters.com)";
 const MAX_PAGES = 200; // safety ceiling for v1 (single domain)
@@ -189,44 +213,52 @@ export async function crawlSite(siteId: string, domain: string) {
       .slice(0, MAX_PAGES);
 
     const allTitlesOnSite = new Map<string, string[]>();
-    const pageResults: { url: string; html: string; status: number; pageType: string }[] = [];
+    const pageResults: { url: string; html: string; renderedHtml: string | null; status: number; pageType: string }[] = [];
 
-    // First pass: fetch all pages. A delay between requests plus retries
-    // with growing backoff on 429/503 keeps a same-domain, 50-200 page
-    // crawl from tripping the target's own rate limiter and getting back
-    // error pages that would otherwise look like real findings.
+    // First pass: fetch all pages (raw HTML) and render each one (rendered
+    // DOM) through a single shared headless-browser instance. A delay
+    // between requests plus retries with growing backoff on 429/503 keeps
+    // a same-domain, 50-200 page crawl from tripping the target's own rate
+    // limiter and getting back error pages that would otherwise look like
+    // real findings.
     const RETRY_BACKOFFS_MS = [3000, 6000, 12000];
-    for (const url of urls) {
-      try {
-        let res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-        for (const fallbackBackoffMs of RETRY_BACKOFFS_MS) {
-          if (res.status !== 429 && res.status !== 503) break;
-          const retryAfterHeader = Number(res.headers.get("retry-after"));
-          const backoffMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : fallbackBackoffMs;
-          await new Promise((r) => setTimeout(r, backoffMs));
-          res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-        }
-        const html = await res.text();
-        const pageType = classifyPageType(url);
-        pageResults.push({ url, html, status: res.status, pageType });
+    await withRenderer(async (renderPage) => {
+      for (const url of urls) {
+        let html = "";
+        let status = 0;
+        try {
+          let res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+          for (const fallbackBackoffMs of RETRY_BACKOFFS_MS) {
+            if (res.status !== 429 && res.status !== 503) break;
+            const retryAfterHeader = Number(res.headers.get("retry-after"));
+            const backoffMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : fallbackBackoffMs;
+            await new Promise((r) => setTimeout(r, backoffMs));
+            res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+          }
+          html = await res.text();
+          status = res.status;
 
-        const $ = cheerio.load(html);
-        const title = $("title").first().text().trim();
-        if (title) {
-          const existing = allTitlesOnSite.get(title) || [];
-          existing.push(url);
-          allTitlesOnSite.set(title, existing);
+          const $ = cheerio.load(html);
+          const title = $("title").first().text().trim();
+          if (title) {
+            const existing = allTitlesOnSite.get(title) || [];
+            existing.push(url);
+            allTitlesOnSite.set(title, existing);
+          }
+        } catch {
+          // pageResults still gets a row below, with empty html/status 0
         }
-      } catch (err) {
-        pageResults.push({ url, html: "", status: 0, pageType: classifyPageType(url) });
+
+        const renderedHtml = status >= 200 && status < 300 ? await renderPage(url) : null;
+        pageResults.push({ url, html, renderedHtml, status, pageType: classifyPageType(url) });
+        await new Promise((r) => setTimeout(r, 350));
       }
-      await new Promise((r) => setTimeout(r, 350));
-    }
+    });
 
     // Second pass: run checks now that we have sitewide title data for duplicate detection
     let totalFindings = 0;
     let homepage: { pageId: string; html: string } | null = null;
-    for (const { url, html, status, pageType } of pageResults) {
+    for (const { url, html, renderedHtml, status, pageType } of pageResults) {
       const $ = cheerio.load(html);
       const page = await prisma.page.upsert({
         where: { siteId_url: { siteId, url } },
@@ -252,6 +284,20 @@ export async function crawlSite(siteId: string, domain: string) {
         },
       });
 
+      if (html) {
+        await prisma.pageSnapshot.upsert({
+          where: { crawlId_pageId: { crawlId: crawl.id, pageId: page.id } },
+          update: { rawHtml: html, rawHtmlHash: createHash("sha256").update(html).digest("hex"), renderedHtml },
+          create: {
+            crawlId: crawl.id,
+            pageId: page.id,
+            rawHtml: html,
+            rawHtmlHash: createHash("sha256").update(html).digest("hex"),
+            renderedHtml,
+          },
+        });
+      }
+
       if (pageType === "homepage") homepage = { pageId: page.id, html };
 
       const findings: RawFinding[] = runAllChecks({
@@ -262,22 +308,12 @@ export async function crawlSite(siteId: string, domain: string) {
         allTitlesOnSite,
       });
 
+      if (renderedHtml) {
+        findings.push(...runRenderComparisonChecks(html, renderedHtml));
+      }
+
       for (const f of findings) {
-        await prisma.finding.create({
-          data: {
-            crawlId: crawl.id,
-            pageId: page.id,
-            category: f.category,
-            checkStep: f.checkStep,
-            title: f.title,
-            description: f.description,
-            fixType: f.fixType,
-            howToTest: f.howToTest,
-            priority: f.priority,
-            owner: f.owner,
-            status: "PENDING",
-          },
-        });
+        await createFindingRecord(crawl.id, page.id, f);
         totalFindings++;
       }
     }
@@ -288,21 +324,7 @@ export async function crawlSite(siteId: string, domain: string) {
     if (homepage) {
       const localFindings = await runLocalSeoChecks(siteId, homepage.html);
       for (const f of localFindings) {
-        await prisma.finding.create({
-          data: {
-            crawlId: crawl.id,
-            pageId: homepage.pageId,
-            category: f.category,
-            checkStep: f.checkStep,
-            title: f.title,
-            description: f.description,
-            fixType: f.fixType,
-            howToTest: f.howToTest,
-            priority: f.priority,
-            owner: f.owner,
-            status: "PENDING",
-          },
-        });
+        await createFindingRecord(crawl.id, homepage.pageId, f);
         totalFindings++;
       }
     }

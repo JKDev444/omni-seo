@@ -62,6 +62,8 @@ export function FindingsList({
                   <span>{f.checkStep}</span>
                   {f.page && <span>{pathFromUrl(f.page.url)}</span>}
                   {f.owner && <span>owner: {f.owner}</span>}
+                  {f.fixLocation && <span>fix in: {f.fixLocation}</span>}
+                  {f.confidence < 100 && <span>{f.confidence}% confidence</span>}
                 </div>
               </div>
             ))}
