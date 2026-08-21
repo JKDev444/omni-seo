@@ -43,7 +43,7 @@ exists for going deep on one specific thing.
 | M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, and systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates) are live, part of every crawl. Not built: schema-vs-visible-content mismatch, schema-URL-redirect checks, and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
 | P | Guided Roadmap (`/action-plan`) | **Live** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page, with in-app buttons to mark a finding done/ignored/false-positive (a server action, `lib/actions/findingActions.ts`). Status carries forward across crawls (`lib/findings/createFinding.ts` checks the prior crawl for a matching finding and carries IGNORED/FALSE_POSITIVE/ACCEPTED onto the new one — COMPLETED deliberately does not carry forward, so a still-broken issue resurfaces as a real regression instead of staying hidden). Not built: 30/60/90-day framing, platform-specific exact fix instructions beyond what Finding.fixType already gives |
 
-| R | Automation (scheduled sync, no more manual script runs) | **Partial** — see Automation section below. Not built: regression detection (diffing consecutive crawl snapshots), SEO change tracking, deployment verification gate |
+| R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below) and regression detection are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. Not built: SEO change tracking (a full changelog of every field change, not just regressions), deployment verification gate |
 
 Not started: N (AI Search Readiness), O (Shopify/e-commerce specifics), Q
 (Reporting), S (Auto-fix/agentic remediation).
@@ -85,6 +85,15 @@ citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 `/performance` (CWV) · `/internal-links` · `/content` (LLM content
 review) · `/keywords` (rank tracking + cannibalization + decay + CTR
 rewrites) · `/content-stacks` · `/backlinks` · `/login`
+
+The Backlinks, Keywords, and Indexation pages' biggest tables (150, 117,
+182+ rows) use `components/FilterableTable.tsx` — a client-side search
+box, since scrolling to find one row in a list that size was the app's
+most obvious usability gap. Server Components pre-render each row's
+cells and a plain search string; the client component only handles
+filtering (functions can't cross the Server-to-Client Component
+boundary, only data and already-rendered JSX — confirmed by a real crash
+when the first version tried).
 
 ## Integrations and what each needs
 
