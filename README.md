@@ -15,7 +15,16 @@ context: this is the whole picture as of the last commit.
 Next.js 15 (App Router) → GitHub (JKDev444/omni-seo) → Vercel (hosting +
 Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login)
 
-## Status: Phases A–L complete
+## Status: Phases A–M complete (M partial), P partial
+
+**The core intent of this app**: not just a pile of diagnostic reports —
+a tool that tells the user everything they need to do, on whatever
+cadence, to get SEO to 100%, the way SearchAtlas did. `/action-plan` is
+the answer to that: the post-login landing page, pulling every open
+Finding plus CTR rewrite suggestions, weak content clusters, backlink
+outreach targets, and this month's recurring maintenance tasks into one
+prioritized Do Now / This Month / Ongoing view. Every other page still
+exists for going deep on one specific thing.
 
 | Phase | What it is | Status |
 |---|---|---|
@@ -32,17 +41,19 @@ Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
 | M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, and systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates) are live, part of every crawl. Not built: schema-vs-visible-content mismatch, schema-URL-redirect checks, and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
+| P | Guided Roadmap (`/action-plan`) | **Live** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page. Not built: 30/60/90-day framing, platform-specific exact fix instructions beyond what Finding.fixType already gives |
 
-Not started: N (AI Search Readiness), O (Shopify/e-commerce specifics), P
-(Guided Roadmap), Q (Reporting), R (Automation/Cron/regression detection),
-S (Auto-fix/agentic remediation).
+Not started: N (AI Search Readiness), O (Shopify/e-commerce specifics), Q
+(Reporting), R (Automation/Cron/regression detection), S (Auto-fix/
+agentic remediation).
 
 ## Pages in the app
-`/dashboard` (health rings, findings, scorecard, citations, maintenance) ·
-`/analytics` (GSC+GA4) · `/indexation` · `/performance` (CWV) ·
-`/internal-links` · `/content` (LLM content review) · `/keywords` (rank
-tracking + cannibalization + decay + CTR rewrites) · `/content-stacks` ·
-`/backlinks` · `/login`
+`/action-plan` (post-login landing page — the unified Do Now / This
+Month / Ongoing plan) · `/dashboard` (health rings, findings, scorecard,
+citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
+`/performance` (CWV) · `/internal-links` · `/content` (LLM content
+review) · `/keywords` (rank tracking + cannibalization + decay + CTR
+rewrites) · `/content-stacks` · `/backlinks` · `/login`
 
 ## Integrations and what each needs
 
