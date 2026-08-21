@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/performance", label: "Performance" },
   { href: "/internal-links", label: "Internal Links" },
   { href: "/content", label: "Content Quality" },
+  { href: "/ai-search", label: "AI Search Readiness" },
   { href: "/keywords", label: "Keywords" },
   { href: "/content-stacks", label: "Content Stacks" },
   { href: "/backlinks", label: "Backlinks" },

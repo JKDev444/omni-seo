@@ -95,6 +95,7 @@ model Site {
   contentStacks ContentStack[]
   backlinkProfiles BacklinkProfile[]
   backlinkGapDomains BacklinkGapDomain[]
+  aiSearchReadiness AiSearchReadiness[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -133,6 +134,7 @@ model Page {
   contentAnalyses ContentAnalysis[]
   ctrRewriteSuggestions CtrRewriteSuggestion[]
   contentStackMemberships ContentStackMember[]
+  aiSearchReadiness AiSearchReadiness[]
 
   @@unique([siteId, url])
 }
@@ -549,6 +551,31 @@ model Keyword {
   rankings     KeywordRanking[]
 
   @@unique([siteId, phrase])
+}
+
+// Phase N: AI Search Readiness — how citeable/extractable this page's
+// content is for AI Overviews, ChatGPT, and similar answer engines.
+// Deliberately NOT a claim of measuring actual AI-citation rankings
+// (that needs a paid tracking service like Otterly.ai/Peec AI) — this
+// scores the on-page signals that make citation more likely. Same
+// cost-aware caching pattern as ContentAnalysis: a real per-page LLM
+// call, cached by content hash, only re-run explicitly.
+model AiSearchReadiness {
+  id                  String   @id @default(cuid())
+  siteId              String
+  site                Site     @relation(fields: [siteId], references: [id])
+  pageId              String
+  page                Page     @relation(fields: [pageId], references: [id])
+  url                 String
+  contentHash         String
+  entityClarityScore  Int?
+  citationReadinessScore Int?
+  extractabilityScore Int?
+  hasAnswerBlock      Boolean  @default(false)
+  issues              Json?    // [{ dimension, score, issue }]
+  fetchedAt           DateTime @default(now())
+
+  @@unique([siteId, url])
 }
 
 // One row per rank-check. Kept as a full history (not just latest) so
