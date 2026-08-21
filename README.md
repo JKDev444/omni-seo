@@ -45,8 +45,10 @@ exists for going deep on one specific thing.
 
 | R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below) and regression detection are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. Not built: SEO change tracking (a full changelog of every field change, not just regressions), deployment verification gate |
 
-Not started: N (AI Search Readiness), O (Shopify/e-commerce specifics), Q
-(Reporting), S (Auto-fix/agentic remediation).
+| N | AI Search Readiness (`/ai-search`) | **Live, real data** — entity clarity, citation readiness, extractability, and direct-answer-block detection per page, LLM-assisted (same pattern as Phase H, with every lesson from it applied from the start — compact JSON, brace-repair, timeout, real max_tokens headroom). Not a claim of measuring actual AI-citation rankings (needs a paid tracking service like Otterly.ai/Peec AI) — scores the on-page signals that make citation more likely. Runs monthly via GitHub Actions alongside the other LLM checks |
+
+Not started: O (Shopify/e-commerce specifics), Q (Reporting), S
+(Auto-fix/agentic remediation).
 
 ## Automation
 
@@ -83,7 +85,7 @@ observed crawl time is 10-25 minutes, which exceeds even that):
 Month / Ongoing plan) · `/dashboard` (health rings, findings, scorecard,
 citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 `/performance` (CWV) · `/internal-links` · `/content` (LLM content
-review) · `/keywords` (rank tracking + cannibalization + decay + CTR
+review) · `/ai-search` (AI Search Readiness) · `/keywords` (rank tracking + cannibalization + decay + CTR
 rewrites) · `/content-stacks` · `/backlinks` · `/login`
 
 The Backlinks, Keywords, and Indexation pages' biggest tables (150, 117,

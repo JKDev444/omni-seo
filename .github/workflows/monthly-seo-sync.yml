@@ -31,6 +31,8 @@ jobs:
       - run: npm ci
       - name: LLM content review (real Anthropic API cost)
         run: npx tsx scripts/runContentAnalysis.ts omnicenters.com 200
+      - name: AI Search Readiness (real Anthropic API cost)
+        run: npx tsx scripts/runAiSearchReadiness.ts omnicenters.com 200
       - name: CTR rewrite suggestions (real Anthropic API cost)
         run: npx tsx scripts/runCtrRewrites.ts omnicenters.com
       - name: Content stack topical clustering (real Anthropic API cost)
