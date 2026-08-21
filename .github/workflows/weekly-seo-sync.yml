@@ -1,0 +1,40 @@
+name: Weekly SEO Sync
+
+# Runs the checks that are too slow for a Vercel serverless function
+# (real observed times: full crawl 10-25 min, keyword rank checks several
+# minutes) — GitHub Actions jobs have no comparable timeout, so this is
+# where they belong. See README.md's Automation section. The genuinely
+# fast operations (GSC/GA4 sync, GBP profile pull) run on Vercel Cron
+# instead (vercel.json + app/api/cron/sync-fast).
+on:
+  schedule:
+    - cron: "0 14 * * 1" # Monday 14:00 UTC
+  workflow_dispatch: {} # allows manually triggering a run from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
+      DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+      GOOGLE_PAGESPEED_API_KEY: ${{ secrets.GOOGLE_PAGESPEED_API_KEY }}
+      GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Full crawl (technical/schema/content/internal-link checks)
+        run: npx tsx scripts/runCrawl.ts omnicenters.com
+      - name: Indexation check (URL Inspection API)
+        run: npx tsx scripts/runIndexationCheck.ts omnicenters.com
+      - name: Core Web Vitals (CrUX + PSI)
+        run: npx tsx scripts/runCoreWebVitalsCheck.ts omnicenters.com
+      - name: Keyword rank checks
+        run: npx tsx scripts/runKeywordRankings.ts omnicenters.com

@@ -7,6 +7,13 @@ import { authConfig } from "./auth.config";
 const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
+  // Cron routes authenticate via CRON_SECRET (Vercel's trigger sends a
+  // Bearer token, not a browser session cookie) -- redirecting them into
+  // the login-page flow like every other route meant the cron job could
+  // never actually reach its handler at all, confirmed by testing the
+  // real endpoint locally before deploying.
+  if (req.nextUrl.pathname.startsWith("/api/cron/")) return;
+
   const isLoggedIn = !!req.auth;
   const isLoginPage = req.nextUrl.pathname.startsWith("/login");
 

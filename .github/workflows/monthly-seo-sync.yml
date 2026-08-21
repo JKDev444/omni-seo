@@ -1,0 +1,39 @@
+name: Monthly SEO Sync
+
+# The slower-changing, higher-cost checks (LLM content review, CTR
+# rewrite generation, content-stack clustering, backlinks) -- monthly
+# cadence keeps real per-call API cost (Anthropic, DataForSEO) reasonable
+# for data that doesn't meaningfully change week to week. See
+# README.md's Automation section for the full split across this workflow,
+# weekly-seo-sync.yml, and Vercel Cron.
+on:
+  schedule:
+    - cron: "0 15 1 * *" # 1st of the month, 15:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
+      DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
+      GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+      GOOGLE_PAGESPEED_API_KEY: ${{ secrets.GOOGLE_PAGESPEED_API_KEY }}
+      GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: LLM content review (real Anthropic API cost)
+        run: npx tsx scripts/runContentAnalysis.ts omnicenters.com 200
+      - name: CTR rewrite suggestions (real Anthropic API cost)
+        run: npx tsx scripts/runCtrRewrites.ts omnicenters.com
+      - name: Content stack topical clustering (real Anthropic API cost)
+        run: npx tsx scripts/runContentStackClustering.ts omnicenters.com
+      - name: Backlinks + competitor gap (real DataForSEO API cost)
+        run: npx tsx scripts/runBacklinksCheck.ts omnicenters.com
