@@ -15,7 +15,7 @@ context: this is the whole picture as of the last commit.
 Next.js 15 (App Router) → GitHub (JKDev444/omni-seo) → Vercel (hosting +
 Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login)
 
-## Status: Phases A–L, N complete; F caveated, M/P/R partial; K deliberately skipped
+## Status: Phases A–L, N, Q complete; F caveated, M/P/R partial; K skipped by choice, O out of scope (no products)
 
 **The core intent of this app**: not just a pile of diagnostic reports —
 a tool that tells the user everything they need to do, on whatever
@@ -47,8 +47,16 @@ exists for going deep on one specific thing.
 
 | N | AI Search Readiness (`/ai-search`) | **Live, real data** — entity clarity, citation readiness, extractability, and direct-answer-block detection per page, LLM-assisted (same pattern as Phase H, with every lesson from it applied from the start — compact JSON, brace-repair, timeout, real max_tokens headroom). Not a claim of measuring actual AI-citation rankings (needs a paid tracking service like Otterly.ai/Peec AI) — scores the on-page signals that make citation more likely. Runs monthly via GitHub Actions alongside the other LLM checks |
 
-Not started: O (Shopify/e-commerce specifics), Q (Reporting), S
-(Auto-fix/agentic remediation).
+| Q | Reporting (`/reports`, real Scorecard) | **Live, real data** — the Scorecard's 5 metrics (`lib/data/scorecardMetrics.ts`) are computed from real data (Technical score reuses the Dashboard's own ring formula; indexed pages from URL Inspection; branded position from GSC; organic sessions from GA4; local pack visibility from KeywordRanking), replacing the original seed script's fabricated placeholder numbers. Baseline freezes on first real computation, `current` updates every run. The monthly client report (`lib/integrations/clientReportGeneration.ts`) is LLM-written from a real data digest — explicitly forbidden from inventing any number, and leads/conversions (no CRM/booking integration exists) is instructed to say so honestly rather than estimate. Scorecard update runs weekly (free); report generation runs monthly (real Anthropic cost) |
+
+**Phase O (Shopify/e-commerce specifics) is deliberately out of scope** —
+omnicenters.com is a services business with no products, so product-page
+checks (variant duplicate URLs, Merchant Center feed, etc.) don't apply
+here.
+
+Not started: S (Auto-fix/agentic remediation) — the long-term "find
+issue → generate a fix → open a PR" vision; not started intentionally,
+since everything before it should be solid first.
 
 ## Automation
 
@@ -86,7 +94,8 @@ Month / Ongoing plan) · `/dashboard` (health rings, findings, scorecard,
 citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 `/performance` (CWV) · `/internal-links` · `/content` (LLM content
 review) · `/ai-search` (AI Search Readiness) · `/keywords` (rank tracking + cannibalization + decay + CTR
-rewrites) · `/content-stacks` · `/backlinks` · `/login`
+rewrites) · `/content-stacks` · `/backlinks` · `/reports` (monthly
+client report) · `/login`
 
 The Backlinks, Keywords, and Indexation pages' biggest tables (150, 117,
 182+ rows) use `components/FilterableTable.tsx` — a client-side search
