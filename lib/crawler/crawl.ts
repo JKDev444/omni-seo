@@ -27,6 +27,7 @@ import { createFindingRecord } from "../findings/createFinding";
 import { extractInternalLinks } from "./extractLinks";
 import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
 import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, type SchemaGap } from "../checks/schemaValidation";
+import { detectRegressions } from "../checks/regressionDetection";
 
 const prisma = new PrismaClient();
 
@@ -295,15 +296,36 @@ export async function crawlSite(siteId: string, domain: string) {
       });
 
       if (html) {
+        const snapshotSchemaTypes: string[] = [];
+        $('script[type="application/ld+json"]').each((_, el) => {
+          try {
+            const parsed = JSON.parse($(el).text());
+            const type = parsed["@type"];
+            if (type) snapshotSchemaTypes.push(...(Array.isArray(type) ? type : [type]));
+          } catch {
+            /* invalid JSON-LD already flagged elsewhere */
+          }
+        });
+
+        const snapshotFields = {
+          statusCode: page.statusCode,
+          title: page.title,
+          metaDesc: page.metaDesc,
+          canonical: page.canonical,
+          h1: page.h1,
+          schemaTypes: snapshotSchemaTypes,
+        };
+
         await prisma.pageSnapshot.upsert({
           where: { crawlId_pageId: { crawlId: crawl.id, pageId: page.id } },
-          update: { rawHtml: html, rawHtmlHash: createHash("sha256").update(html).digest("hex"), renderedHtml },
+          update: { rawHtml: html, rawHtmlHash: createHash("sha256").update(html).digest("hex"), renderedHtml, ...snapshotFields },
           create: {
             crawlId: crawl.id,
             pageId: page.id,
             rawHtml: html,
             rawHtmlHash: createHash("sha256").update(html).digest("hex"),
             renderedHtml,
+            ...snapshotFields,
           },
         });
       }
@@ -404,6 +426,15 @@ export async function crawlSite(siteId: string, domain: string) {
         await createFindingRecord(crawl.id, homepage.pageId, f);
         totalFindings++;
       }
+    }
+
+    // Regression detection — diffs this crawl's snapshots against the
+    // site's previous crawl. Runs last since it needs every snapshot
+    // from this crawl already written.
+    for (const { url, finding } of await detectRegressions(siteId, crawl.id)) {
+      const pageId = urlToPageId.get(url) ?? null;
+      await createFindingRecord(crawl.id, pageId, finding);
+      totalFindings++;
     }
 
     await prisma.crawl.update({

@@ -152,6 +152,17 @@ model PageSnapshot {
   renderedHtml String?  // null if rendering wasn't available for this crawl
   createdAt    DateTime @default(now())
 
+  // Point-in-time copies of the same signals Page tracks (Page only
+  // keeps the latest value) -- needed so regression detection can diff
+  // this crawl's snapshot against the previous one per page without
+  // re-parsing historical raw HTML every time it runs.
+  statusCode   Int?
+  title        String?
+  metaDesc     String?
+  canonical    String?
+  h1           String?
+  schemaTypes  String[] @default([])
+
   @@unique([crawlId, pageId])
   @@index([pageId])
 }
