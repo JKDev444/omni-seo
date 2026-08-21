@@ -22,6 +22,12 @@ export type InspectionResult =
     }
   | { ok: false; reason: "missing_credentials" | "invalid_credentials" | "missing_site_url" | "api_error"; message: string };
 
+/** URLs are equivalent for canonical-comparison purposes modulo a trailing slash (Google treats "example.com" and "example.com/" as the same URL). */
+function urlsEquivalent(a: string, b: string): boolean {
+  const strip = (u: string) => u.replace(/\/$/, "");
+  return strip(a) === strip(b);
+}
+
 /** Buckets Google's raw verdict/coverage/indexing fields into the counts the UI shows. */
 export function normalizeStatus(params: {
   indexingState: string | null;
@@ -32,14 +38,23 @@ export function normalizeStatus(params: {
 }): string {
   const { indexingState, verdict, coverageState, googleCanonical, userCanonical } = params;
 
-  if (indexingState && indexingState !== "INDEXING_ALLOWED") return "Blocked";
+  // INDEXING_STATE_UNSPECIFIED means Google hasn't evaluated this URL yet
+  // (typically: newly discovered, not yet crawled) -- a genuinely different
+  // situation from a deliberate block (BLOCKED_BY_META_TAG,
+  // BLOCKED_BY_ROBOTS_TXT, etc). Lumping them together as "Blocked" turned
+  // "Google hasn't gotten to this new page yet" (expected, no action
+  // needed) into a false alarm indistinguishable from a real noindex bug.
+  if (indexingState && indexingState !== "INDEXING_ALLOWED" && indexingState !== "INDEXING_STATE_UNSPECIFIED") {
+    return "Blocked";
+  }
 
   if (verdict === "PASS") {
-    if (googleCanonical && userCanonical && googleCanonical !== userCanonical) return "Canonical Mismatch";
+    if (googleCanonical && userCanonical && !urlsEquivalent(googleCanonical, userCanonical)) return "Canonical Mismatch";
     return "Indexed";
   }
 
   const state = (coverageState ?? "").toLowerCase();
+  if (state.includes("unknown to google")) return "Not Yet Discovered";
   if (state.includes("discovered")) return "Discovered - Not Indexed";
   if (state.includes("crawled")) return "Crawled - Not Indexed";
   return "Not Indexed";

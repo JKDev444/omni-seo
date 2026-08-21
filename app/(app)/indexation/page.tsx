@@ -1,4 +1,4 @@
-import { getIndexationData } from "@/lib/data/indexation";
+import { getIndexationData, type IndexationRow } from "@/lib/data/indexation";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,7 @@ const STATUS_ORDER = [
   "Canonical Mismatch",
   "Discovered - Not Indexed",
   "Crawled - Not Indexed",
+  "Not Yet Discovered",
 ];
 
 function fmtDateTime(d: Date | null): string {
@@ -23,6 +24,26 @@ function pathFromUrl(url: string): string {
   } catch {
     return url;
   }
+}
+
+/** Translates the raw URL Inspection API fields into a plain-English "why", so a blocked/mismatched page is actionable, not just labeled. */
+function diagnose(r: IndexationRow): string {
+  if (r.robotsTxtState === "DISALLOWED") return "robots.txt disallows this URL for Googlebot.";
+  // INDEXING_STATE_UNSPECIFIED just means "not evaluated yet" (a new or
+  // not-yet-indexed page) -- a real deliberate block always has a specific
+  // reason (BLOCKED_BY_META_TAG, BLOCKED_BY_ROBOTS_TXT, etc), so only
+  // treat those as a "block" explanation; fall through to coverageState
+  // (Google's own plain-English message) for everything else.
+  if (r.indexingState && r.indexingState !== "INDEXING_ALLOWED" && r.indexingState !== "INDEXING_STATE_UNSPECIFIED") {
+    const reason = r.indexingState.replace(/^BLOCKED_BY_/, "").replace(/_/g, " ").toLowerCase();
+    return `Blocked by ${reason}.`;
+  }
+  if (r.googleStatus === "Canonical Mismatch" && r.googleCanonical) {
+    return `Google is treating "${pathFromUrl(r.googleCanonical)}" as canonical instead of this URL${r.userCanonical && r.userCanonical !== r.googleCanonical ? ` (site declares "${pathFromUrl(r.userCanonical)}" as canonical)` : " (no canonical tag declared on this page)"}.`;
+  }
+  if (r.coverageState) return r.coverageState;
+  if (r.verdict) return `Verdict: ${r.verdict}.`;
+  return "No further detail from Google for this URL.";
 }
 
 export default async function IndexationPage() {
@@ -90,6 +111,7 @@ export default async function IndexationPage() {
                 <th>Page</th>
                 <th>Our status code</th>
                 <th>Google's status</th>
+                <th>Why</th>
               </tr>
             </thead>
             <tbody>
@@ -102,6 +124,7 @@ export default async function IndexationPage() {
                       {r.googleStatus}
                     </span>
                   </td>
+                  <td style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)" }}>{diagnose(r)}</td>
                 </tr>
               ))}
             </tbody>
