@@ -1,4 +1,5 @@
 import { getIndexationData, type IndexationRow } from "@/lib/data/indexation";
+import { FilterableTable } from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -134,22 +135,15 @@ export default async function IndexationPage() {
 
       <div className="section card">
         <h2 className="card-title">All inspected pages</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Page</th>
-              <th>Google's status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map((r) => (
-              <tr key={r.url}>
-                <td>{pathFromUrl(r.url)}</td>
-                <td>{r.googleStatus}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <FilterableTable
+          headers={["Page", "Google's status"]}
+          searchPlaceholder="Search pages…"
+          rows={data.rows.map((r) => ({
+            key: r.url,
+            searchText: `${pathFromUrl(r.url)} ${r.googleStatus}`,
+            cells: [pathFromUrl(r.url), r.googleStatus],
+          }))}
+        />
       </div>
     </div>
   );

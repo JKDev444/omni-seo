@@ -1,4 +1,5 @@
 import { getBacklinksPageData } from "@/lib/data/backlinksPageData";
+import { FilterableTable } from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -93,26 +94,16 @@ export default async function BacklinksPage() {
           <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-3)" }}>
             {data.gap.length} outreach opportunities, sorted by the referring domain&apos;s authority (highest first).
           </p>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Referring domain</th>
-                <th>Domain rank</th>
-                <th>Links to competitor</th>
-                <th>Competitor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.gap.slice(0, 100).map((g, i) => (
-                <tr key={`${g.referringDomain}-${g.competitorDomain}-${i}`}>
-                  <td>{g.referringDomain}</td>
-                  <td className="num">{g.referringDomainRank ?? "—"}</td>
-                  <td className="num">{g.backlinksToCompetitor ?? "—"}</td>
-                  <td>{g.competitorDomain}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <FilterableTable
+            headers={["Referring domain", "Domain rank", "Links to competitor", "Competitor"]}
+            searchPlaceholder="Search by domain…"
+            rows={data.gap.map((g, i) => ({
+              key: `${g.referringDomain}-${g.competitorDomain}-${i}`,
+              searchText: `${g.referringDomain} ${g.competitorDomain}`,
+              numericCols: [1, 2],
+              cells: [g.referringDomain, g.referringDomainRank ?? "—", g.backlinksToCompetitor ?? "—", g.competitorDomain],
+            }))}
+          />
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { getKeywordsPageData } from "@/lib/data/keywordsPageData";
+import { FilterableTable } from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -81,36 +82,30 @@ export default async function KeywordsPage() {
 
       <div className="section card">
         <h2 className="card-title">Tracked keywords</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Keyword</th>
-              <th>Target page</th>
-              <th>Volume</th>
-              <th>Position</th>
-              <th>Trend</th>
-              <th>Local pack</th>
-              <th>AI Overview</th>
-              <th>Last checked</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.keywords.map((k) => (
-              <tr key={k.id}>
-                <td>{k.phrase}</td>
-                <td>{k.targetUrl ? pathFromUrl(k.targetUrl) : "—"}</td>
-                <td className="num">{k.searchVolume ?? "—"}</td>
-                <td className="num">{k.latestPosition ?? "not found"}</td>
-                <td className={`num ${trendClass(k.latestPosition, k.previousPosition)}`}>
+        <FilterableTable
+          headers={["Keyword", "Target page", "Volume", "Position", "Trend", "Local pack", "AI Overview", "Last checked"]}
+          searchPlaceholder="Search keywords…"
+          rows={data.keywords.map((k) => {
+            const targetPath = k.targetUrl ? pathFromUrl(k.targetUrl) : "";
+            return {
+              key: k.id,
+              searchText: `${k.phrase} ${targetPath}`,
+              numericCols: [2, 3, 4],
+              cells: [
+                k.phrase,
+                targetPath || "—",
+                k.searchVolume ?? "—",
+                k.latestPosition ?? "not found",
+                <span key="trend" className={trendClass(k.latestPosition, k.previousPosition)}>
                   {trendArrow(k.latestPosition, k.previousPosition)}
-                </td>
-                <td>{k.localPack ? "Yes" : "—"}</td>
-                <td>{k.aiOverview ? "Yes" : "—"}</td>
-                <td>{k.lastCheckedAt ? new Date(k.lastCheckedAt).toLocaleDateString() : "never"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </span>,
+                k.localPack ? "Yes" : "—",
+                k.aiOverview ? "Yes" : "—",
+                k.lastCheckedAt ? new Date(k.lastCheckedAt).toLocaleDateString() : "never",
+              ],
+            };
+          })}
+        />
       </div>
 
       {data.cannibalization.length > 0 && (
