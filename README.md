@@ -31,10 +31,11 @@ Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login
 | J | Content Stacks / topical authority (`/content-stacks`) | Live, real data |
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
+| M | Schema Validation Engine | **Partial** — required properties per type + LocalBusiness/Organization @id consistency are live (part of every crawl, surfaced as regular Findings). Not built: schema-vs-visible-content mismatch, schema-URL-redirect checks, and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
 
-Not started: M (Schema Validation Engine), N (AI Search Readiness), O
-(Shopify/e-commerce specifics), P (Guided Roadmap), Q (Reporting), R
-(Automation/Cron/regression detection), S (Auto-fix/agentic remediation).
+Not started: N (AI Search Readiness), O (Shopify/e-commerce specifics), P
+(Guided Roadmap), Q (Reporting), R (Automation/Cron/regression detection),
+S (Auto-fix/agentic remediation).
 
 ## Pages in the app
 `/dashboard` (health rings, findings, scorecard, citations, maintenance) ·
