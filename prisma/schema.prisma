@@ -598,3 +598,49 @@ model KeywordRanking {
 
   @@index([keywordId, checkedAt])
 }
+
+// Project Tracker — a running phase/task board so the user can follow this
+// project's build progress without reading git history or README diffs.
+// Not tied to a Site (this tracks the tool's own development, not a
+// per-client audit), and deliberately simple: a person or an assistant
+// working on this codebase updates task status directly (UI buttons or
+// scripts/markTask.ts), there's no automated "is this actually done"
+// detection here the way Finding status has.
+enum ProjectPhaseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PARTIAL
+  COMPLETE
+  SKIPPED
+  OUT_OF_SCOPE
+}
+
+enum ProjectTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+
+model ProjectPhase {
+  id      String             @id @default(cuid())
+  key     String             @unique // "A".."S", or a non-letter key like "AUDIT"
+  name    String
+  summary String?
+  order   Int
+  status  ProjectPhaseStatus @default(NOT_STARTED)
+  tasks   ProjectTask[]
+}
+
+model ProjectTask {
+  id          String            @id @default(cuid())
+  phaseId     String
+  phase       ProjectPhase      @relation(fields: [phaseId], references: [id])
+  title       String
+  status      ProjectTaskStatus @default(TODO)
+  notes       String?
+  order       Int
+  completedAt DateTime?
+
+  @@unique([phaseId, title])
+}
