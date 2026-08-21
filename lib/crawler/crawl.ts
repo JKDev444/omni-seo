@@ -28,11 +28,24 @@ import { extractInternalLinks } from "./extractLinks";
 import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
 import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, type SchemaGap } from "../checks/schemaValidation";
 import { detectRegressions } from "../checks/regressionDetection";
+import { ReconciliationTracker } from "../findings/autoResolveFixedFindings";
 
 const prisma = new PrismaClient();
 
 const USER_AGENT = "OmniSEOBot/1.0 (+internal audit tool for omnicenters.com)";
 const MAX_PAGES = 200; // safety ceiling for v1 (single domain)
+
+// Legal, transactional, and directory/admin pages under /pages/ that the
+// generic "everything under /pages/ is a service page" rule below would
+// otherwise misclassify. Real bug this fixes: found live during an
+// accuracy audit -- pages like /pages/privacy-policy and
+// /pages/terms-of-use were classified as service_page, so the content-
+// quality LLM review (which expects service/treatment content) ran
+// against them and produced findings the LLM's own output described as
+// "Not applicable -- privacy policy...", and the internal-link-graph
+// "important page" check flagged them as under-linked money pages.
+// Neither check is meaningful for a legal or confirmation page.
+const UTILITY_PAGE_SLUG_RE = /\/pages\/(privacy-policy|terms-of-use|terms-and-conditions|terms-of-service|cookie-policy|accessibility-statement|refund-policy|shipping-policy|thank-you|appointment-confirmed|order-confirmed|booking-confirmed|covid-19-information|online-booking|[a-z-]*online-profiles)/i;
 
 function classifyPageType(url: string): string {
   const path = new URL(url).pathname;
@@ -48,6 +61,7 @@ function classifyPageType(url: string): string {
   if (path.includes("/collections/")) return "collection_page";
   if (path.includes("/pages/about")) return "about_page";
   if (path.includes("/pages/contact")) return "contact_page";
+  if (UTILITY_PAGE_SLUG_RE.test(path)) return "utility_page";
   if (path.includes("/pages/")) return "service_page"; // most Shopify content pages
   return "other";
 }
@@ -262,6 +276,7 @@ export async function crawlSite(siteId: string, domain: string) {
     // Second pass: run checks now that we have sitewide title/meta data for
     // duplicate detection
     let totalFindings = 0;
+    const tracker = new ReconciliationTracker();
     let homepage: { pageId: string; html: string; url: string } | null = null;
     const allLinks: { sourceUrl: string; targetUrl: string; anchorText: string | null; isContextual: boolean }[] = [];
     const urlToPageId = new Map<string, string>();
@@ -349,50 +364,70 @@ export async function crawlSite(siteId: string, domain: string) {
         pageType,
         allTitlesOnSite,
       });
+      tracker.markEvaluated(page.id, "Step 1 - Raw HTML");
+      tracker.markEvaluated(page.id, "Step 2 - Indexability");
+      tracker.markEvaluated(page.id, "Step 4 - Schema by page type");
 
       findings.push(...runRedirectChainChecks(url, fetchResult));
+      tracker.markEvaluated(page.id, "Technical SEO Engine - Redirects");
       findings.push(...runXRobotsTagCheck(url, fetchResult.xRobotsTag));
+      tracker.markEvaluated(page.id, "Technical SEO Engine - Indexability");
       if (html) {
         const metaDesc = $('meta[name="description"]').attr("content")?.trim() ?? null;
         findings.push(...runDuplicateMetaDescriptionCheck(url, metaDesc, allMetaDescsOnSite));
+        tracker.markEvaluated(page.id, "Technical SEO Engine - Duplicate Content");
         findings.push(...runThinContentCheck(url, html, pageType));
+        tracker.markEvaluated(page.id, "Technical SEO Engine - Content Depth");
         findings.push(...runSchemaRequiredPropertiesCheck(html));
+        tracker.markEvaluated(page.id, "Schema Validation - Required Properties");
         const localBusinessId = extractLocalBusinessId(html);
         pagesWithLocalBusinessIds.push({ url, id: localBusinessId, hasLocalBusinessSchema: localBusinessId !== null });
         pagesWithSchemaGaps.push({ url, gaps: detectSchemaGaps(html) });
       }
       if (renderedHtml) {
         findings.push(...runRenderComparisonChecks(html, renderedHtml));
+        tracker.markEvaluated(page.id, "Rendered DOM Comparison");
       }
 
       for (const f of findings) {
         await createFindingRecord(crawl.id, page.id, f);
+        tracker.markCreated({ pageId: page.id, category: f.category, checkStep: f.checkStep, title: f.title });
         totalFindings++;
       }
     }
 
     // Sitewide canonical URL pattern consistency (protocol/www) — needs
     // every page's canonical before it can tell what the dominant pattern is.
+    for (const { url: pUrl } of pagesWithCanonicals) {
+      tracker.markEvaluated(urlToPageId.get(pUrl) ?? null, "Technical SEO Engine - URL Consistency");
+    }
     for (const { url, finding } of runCanonicalConsistencyCheck(pagesWithCanonicals)) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
+      tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
       totalFindings++;
     }
 
     // Sitewide LocalBusiness/Organization @id consistency — same reasoning
     // as canonical consistency: needs every page's entity @id before it
     // can tell which one is the dominant, correct one.
+    for (const { url: pUrl } of pagesWithLocalBusinessIds) {
+      tracker.markEvaluated(urlToPageId.get(pUrl) ?? null, "Schema Validation - Entity Consistency");
+    }
     for (const { url, finding } of runLocalBusinessIdConsistencyCheck(pagesWithLocalBusinessIds)) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
+      tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
       totalFindings++;
     }
 
     // Sitewide schema gap pattern detection — attached to the homepage
     // since it's a site-level issue (one shared template), not any single
     // page's problem, same reasoning as the Local SEO NAP check.
+    tracker.markEvaluated(homepage?.pageId ?? null, "Schema Validation - Systemic Gap");
     for (const finding of runSystemicSchemaGapCheck(pagesWithSchemaGaps)) {
       await createFindingRecord(crawl.id, homepage?.pageId ?? null, finding);
+      tracker.markCreated({ pageId: homepage?.pageId ?? null, category: finding.category, checkStep: finding.checkStep, title: finding.title });
       totalFindings++;
     }
 
@@ -410,9 +445,13 @@ export async function crawlSite(siteId: string, domain: string) {
         pages: pageResults.map((p) => ({ url: p.url, pageType: p.pageType })),
         links: allLinks,
       });
+      for (const p of pageResults) {
+        tracker.markEvaluated(urlToPageId.get(p.url) ?? null, "Internal Link Graph");
+      }
       for (const { url, finding } of runInternalLinkFindings(stats)) {
         const pageId = urlToPageId.get(url) ?? null;
         await createFindingRecord(crawl.id, pageId, finding);
+        tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
         totalFindings++;
       }
     }
@@ -421,9 +460,11 @@ export async function crawlSite(siteId: string, domain: string) {
     // schema, and the cached GBP public listing. Runs once against the
     // homepage rather than per page.
     if (homepage) {
+      tracker.markEvaluated(homepage.pageId, "Step 5 - Local SEO");
       const localFindings = await runLocalSeoChecks(siteId, homepage.html);
       for (const f of localFindings) {
         await createFindingRecord(crawl.id, homepage.pageId, f);
+        tracker.markCreated({ pageId: homepage.pageId, category: f.category, checkStep: f.checkStep, title: f.title });
         totalFindings++;
       }
     }
@@ -431,11 +472,24 @@ export async function crawlSite(siteId: string, domain: string) {
     // Regression detection — diffs this crawl's snapshots against the
     // site's previous crawl. Runs last since it needs every snapshot
     // from this crawl already written.
+    for (const p of pageResults) {
+      tracker.markEvaluated(urlToPageId.get(p.url) ?? null, "Regression Detection");
+    }
     for (const { url, finding } of await detectRegressions(siteId, crawl.id)) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
+      tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
       totalFindings++;
     }
+
+    // Complement to the crawl's own detection: any PENDING finding for a
+    // (page, checkStep) pair that was genuinely re-evaluated this crawl,
+    // and did NOT get recreated, means the underlying issue is actually
+    // gone -- mark it resolved instead of leaving it stuck open forever.
+    // Deliberately excludes findings from separately-scripted checks
+    // (Content Depth LLM Review, AI Search Readiness, Core Web Vitals)
+    // since those weren't re-run by this crawl at all.
+    await tracker.resolveFixedFindings(siteId);
 
     await prisma.crawl.update({
       where: { id: crawl.id },

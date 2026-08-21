@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { reviewPageContent } from "./anthropicContentReview";
 import { extractVisibleText, runContentDepthChecks } from "@/lib/checks/contentDepthChecks";
 import { createFindingRecord } from "@/lib/findings/createFinding";
+import { ReconciliationTracker } from "@/lib/findings/autoResolveFixedFindings";
 
 // Content-heavy page types worth the per-page LLM cost; utility pages
 // (contact, search, collection listings) aren't worth reviewing this way.
@@ -41,6 +42,20 @@ export async function pullContentAnalysis(
   let errors = 0;
   let findingsCreated = 0;
   const errorDetails: { url: string; reason: string; message: string }[] = [];
+  const tracker = new ReconciliationTracker();
+
+  // A page that no longer qualifies as reviewable (e.g. reclassified from
+  // service_page to utility_page after a crawl fix) can never re-earn a
+  // fresh review under the current logic -- it's simply excluded from the
+  // query above. Without this, a stale finding from when it WAS reviewed
+  // would sit open forever. This costs no LLM calls, so it runs for every
+  // page on the site, not just the cost-capped batch below.
+  const allPages = await prisma.page.findMany({ where: { siteId }, select: { id: true, pageType: true } });
+  for (const p of allPages) {
+    if (!REVIEWABLE_TYPES.includes(p.pageType)) {
+      tracker.markEvaluated(p.id, "Content Depth - LLM Review");
+    }
+  }
 
   for (const snap of snapshots) {
     const existing = await prisma.contentAnalysis.findUnique({ where: { siteId_url: { siteId, url: snap.page.url } } });
@@ -90,12 +105,16 @@ export async function pullContentAnalysis(
       },
     });
     analyzed++;
+    tracker.markEvaluated(snap.pageId, "Content Depth - LLM Review");
 
     for (const finding of runContentDepthChecks(s)) {
       await createFindingRecord(latestCrawl.id, snap.pageId, finding);
+      tracker.markCreated({ pageId: snap.pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
       findingsCreated++;
     }
   }
+
+  await tracker.resolveFixedFindings(siteId);
 
   return { ok: true, analyzed, skippedUnchanged, errors, errorDetails, findingsCreated };
 }

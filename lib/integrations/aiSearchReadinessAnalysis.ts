@@ -4,6 +4,7 @@ import { reviewAiSearchReadiness } from "./anthropicAiSearchReadiness";
 import { extractVisibleText } from "@/lib/checks/contentDepthChecks";
 import { runAiSearchReadinessChecks } from "@/lib/checks/aiSearchReadinessChecks";
 import { createFindingRecord } from "@/lib/findings/createFinding";
+import { ReconciliationTracker } from "@/lib/findings/autoResolveFixedFindings";
 
 // Same reviewable set as Content Depth (Phase H) -- utility pages aren't
 // worth the per-page LLM cost here either.
@@ -42,6 +43,17 @@ export async function pullAiSearchReadiness(
   let errors = 0;
   let findingsCreated = 0;
   const errorDetails: { url: string; reason: string; message: string }[] = [];
+  const tracker = new ReconciliationTracker();
+
+  // Same reasoning as Content Depth's reconciliation: a page reclassified
+  // out of REVIEWABLE_TYPES can never re-earn a fresh review, so any
+  // stale finding from when it WAS reviewed needs resolving explicitly.
+  const allPages = await prisma.page.findMany({ where: { siteId }, select: { id: true, pageType: true } });
+  for (const p of allPages) {
+    if (!REVIEWABLE_TYPES.includes(p.pageType)) {
+      tracker.markEvaluated(p.id, "AI Search Readiness");
+    }
+  }
 
   for (const snap of snapshots) {
     const existing = await prisma.aiSearchReadiness.findUnique({ where: { siteId_url: { siteId, url: snap.page.url } } });
@@ -87,12 +99,16 @@ export async function pullAiSearchReadiness(
       },
     });
     analyzed++;
+    tracker.markEvaluated(snap.pageId, "AI Search Readiness");
 
     for (const finding of runAiSearchReadinessChecks(s)) {
       await createFindingRecord(latestCrawl.id, snap.pageId, finding);
+      tracker.markCreated({ pageId: snap.pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
       findingsCreated++;
     }
   }
+
+  await tracker.resolveFixedFindings(siteId);
 
   return { ok: true, analyzed, skippedUnchanged, errors, errorDetails, findingsCreated };
 }

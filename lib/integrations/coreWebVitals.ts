@@ -3,6 +3,7 @@ import { fetchCruxData, type FormFactor } from "./crux";
 import { fetchPageSpeedInsights } from "./pagespeed";
 import { runCoreWebVitalsChecks } from "@/lib/checks/coreWebVitalsChecks";
 import { createFindingRecord } from "@/lib/findings/createFinding";
+import { ReconciliationTracker } from "@/lib/findings/autoResolveFixedFindings";
 
 const FORM_FACTORS: FormFactor[] = ["PHONE", "DESKTOP"];
 
@@ -27,6 +28,7 @@ export async function pullCoreWebVitals(
   let errors = 0;
   const errorDetails: { url: string; formFactor: string; message: string }[] = [];
   let findingsCreated = 0;
+  const tracker = new ReconciliationTracker();
 
   for (const { id: pageId, url, pageType } of pages) {
     for (const formFactor of FORM_FACTORS) {
@@ -72,6 +74,12 @@ export async function pullCoreWebVitals(
       pulled++;
 
       if (latestCrawl) {
+        // Both form factors share one checkStep/pageId key, so mark the
+        // page evaluated once real metrics come back for either -- this
+        // is what lets a since-fixed CWV finding actually get resolved
+        // instead of sitting open forever (same gap fixed for crawl-time
+        // checks in lib/crawler/crawl.ts).
+        tracker.markEvaluated(pageId, "Core Web Vitals - Field Data");
         const findings = runCoreWebVitalsChecks({
           url,
           formFactor,
@@ -85,6 +93,7 @@ export async function pullCoreWebVitals(
         });
         for (const f of findings) {
           await createFindingRecord(latestCrawl.id, pageId, f);
+          tracker.markCreated({ pageId, category: f.category, checkStep: f.checkStep, title: f.title });
           findingsCreated++;
         }
       }
@@ -121,6 +130,8 @@ export async function pullCoreWebVitals(
       }
     }
   }
+
+  if (latestCrawl) await tracker.resolveFixedFindings(siteId);
 
   return { ok: true, pulled, noData, errors, errorDetails, findingsCreated };
 }

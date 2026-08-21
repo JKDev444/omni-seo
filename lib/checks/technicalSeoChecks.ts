@@ -110,7 +110,7 @@ const THIN_CONTENT_WORD_THRESHOLD = 150;
 
 export function runThinContentCheck(url: string, rawHtml: string, pageType: string): RawFinding[] {
   // Utility/system page types aren't expected to carry much body copy.
-  if (pageType === "contact_page" || pageType === "collection_page") return [];
+  if (pageType === "contact_page" || pageType === "collection_page" || pageType === "utility_page") return [];
 
   const text = extractVisibleText(rawHtml);
   const wordCount = text ? text.split(" ").length : 0;
