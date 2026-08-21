@@ -212,11 +212,13 @@ model ScorecardMetric {
   siteId    String
   site      Site     @relation(fields: [siteId], references: [id])
   metric    String   // "Technical SEO score", "Indexed pages (GSC)", etc.
-  baseline  Float?
+  baseline  Float?   // frozen at whatever "current" was the first time this metric was computed from real data -- never touched again
   current   Float?
   target    Float?
   source    String?  // GSC | GA4 | crawler | manual
   updatedAt DateTime @updatedAt
+
+  @@unique([siteId, metric])
 }
 
 // Mirrors the "Citation Tracker" tab exactly: Directory / Profile, Public
