@@ -44,7 +44,8 @@ export interface ActionPlanData {
   latestCrawlAt: Date | null;
   doNow: FindingWithPage[]; // CRITICAL + HIGH open findings
   thisMonth: {
-    findings: FindingWithPage[]; // MEDIUM open findings
+    findings: FindingWithPage[]; // MEDIUM open findings, capped for display
+    findingsTotal: number; // real count, before capping
     ctrRewrites: CtrRewriteAction[];
     contentStackGaps: ContentStackAction[];
     backlinkOutreach: BacklinkOutreachAction[];
@@ -64,7 +65,7 @@ export async function getActionPlanData(): Promise<ActionPlanData> {
       site: null,
       latestCrawlAt: null,
       doNow: [],
-      thisMonth: { findings: [], ctrRewrites: [], contentStackGaps: [], backlinkOutreach: [] },
+      thisMonth: { findings: [], findingsTotal: 0, ctrRewrites: [], contentStackGaps: [], backlinkOutreach: [] },
       ongoing: { findings: [], maintenanceTasks: [], maintenanceMonth: "" },
       counts: { critical: 0, high: 0, medium: 0, low: 0 },
     };
@@ -113,7 +114,8 @@ export async function getActionPlanData(): Promise<ActionPlanData> {
     latestCrawlAt: latestCrawl?.startedAt ?? null,
     doNow: [...byPriority.CRITICAL, ...byPriority.HIGH],
     thisMonth: {
-      findings: byPriority.MEDIUM,
+      findings: byPriority.MEDIUM.slice(0, 20),
+      findingsTotal: byPriority.MEDIUM.length,
       ctrRewrites: ctrRewrites.map((r) => ({
         url: r.url,
         suggestedTitle: r.suggestedTitle,

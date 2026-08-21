@@ -125,7 +125,10 @@ export default async function ActionPlanPage() {
           {data.thisMonth.findings.length > 0 && (
             <div style={{ marginBottom: "var(--space-4)" }}>
               <h3 style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-2)" }}>
-                Medium-priority findings
+                Medium-priority findings — showing {data.thisMonth.findings.length} of {data.thisMonth.findingsTotal}
+                {data.thisMonth.findingsTotal > data.thisMonth.findings.length && (
+                  <> — see <a href="/dashboard#findings">Overview &gt; Findings</a> for the complete list</>
+                )}
               </h3>
               {data.thisMonth.findings.map((f) => (
                 <FindingCard key={f.id} f={f} />
