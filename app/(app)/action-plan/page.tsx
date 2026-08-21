@@ -1,4 +1,5 @@
 import { getActionPlanData, type FindingWithPage } from "@/lib/data/actionPlan";
+import { updateFindingStatus } from "@/lib/actions/findingActions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,10 @@ function fmtDate(d: Date | null): string {
 }
 
 function FindingCard({ f }: { f: FindingWithPage }) {
+  const markDone = updateFindingStatus.bind(null, f.id, "COMPLETED");
+  const ignore = updateFindingStatus.bind(null, f.id, "IGNORED");
+  const falsePositive = updateFindingStatus.bind(null, f.id, "FALSE_POSITIVE");
+
   return (
     <div style={{ padding: "var(--space-3) 0", borderBottom: "1px solid var(--color-border)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)" }}>
@@ -30,6 +35,23 @@ function FindingCard({ f }: { f: FindingWithPage }) {
         </p>
       )}
       {f.page && <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)" }}>{pathFromUrl(f.page.url)}</p>}
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+        <form action={markDone}>
+          <button type="submit" className="action-btn action-btn-done">
+            Mark done
+          </button>
+        </form>
+        <form action={ignore}>
+          <button type="submit" className="action-btn">
+            Ignore
+          </button>
+        </form>
+        <form action={falsePositive}>
+          <button type="submit" className="action-btn">
+            False positive
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
