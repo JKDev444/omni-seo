@@ -1,6 +1,7 @@
 import { V1_DOMAIN } from "@/lib/data/dashboard";
 
 const NAV_ITEMS = [
+  { href: "/action-plan", label: "Action Plan" },
   { href: "/dashboard", label: "Overview" },
   { href: "/analytics", label: "Analytics" },
   { href: "/indexation", label: "Indexation" },
