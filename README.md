@@ -154,6 +154,46 @@ npx tsx scripts/runBacklinksCheck.ts [domain] [competitor1,competitor2,...]
   discovery was tried and rejected (surfaced Facebook/Instagram/YouTube,
   not real local competitors).
 
+## Accuracy audit (2026-08-21)
+Prompted by a direct question: "is this app properly giving the right SEO
+information back after audits?" Rather than more features, this was a
+deliberate pass sampling real findings from every check category and
+verifying each one against the live site (curl, direct DB queries,
+browser) — not just confirming the code runs.
+
+Two real bugs found and fixed as a result:
+- **Cross-crawl finding visibility** — Dashboard and Action Plan filtered
+  findings by `crawlId: latestCrawl.id`, but LLM-based checks (content
+  review, AI Search Readiness) run on their own cadence and attach
+  findings to whatever crawl was "latest" *at the time*. Any later crawl
+  orphaned those findings off-screen entirely. Fixed with
+  `lib/findings/getOpenFindings.ts` — "open" is now defined per distinct
+  issue (page + category + checkStep + title), not per crawl. Real impact
+  when found: 351 Content Depth findings alone were invisible on both
+  pages.
+- **Findings never auto-resolving** — the above fix exposed the next
+  layer: a finding is only ever created when a check *detects* a problem,
+  never when it confirms one is gone, so a genuinely-fixed issue (e.g. a
+  canonical tag added back) stayed open forever with nothing to supersede
+  it. Confirmed live: `/pages/laser-hair-removal` was still flagged
+  "Missing canonical tag" from the very first crawl, days after the tag
+  was actually confirmed present on every crawl since. Fixed with
+  `lib/findings/autoResolveFixedFindings.ts` (`ReconciliationTracker`) —
+  wired into `crawl.ts`, `coreWebVitals.ts`, `contentAnalysis.ts`, and
+  `aiSearchReadinessAnalysis.ts`, so any PENDING finding whose
+  (page, checkStep) was genuinely re-evaluated this run — and not
+  recreated — flips to VERIFIED.
+- Also found via the same audit: `classifyPageType()` treated *every*
+  URL under `/pages/` as a service page, so content-quality/AI-readiness
+  LLM checks ran against Privacy Policy, Terms of Use, Thank You, and
+  similar utility pages — producing findings the LLM's own output
+  described as "Not applicable." Added a `UTILITY_PAGE` type with a
+  slug-based exclusion list, verified against 7 real misclassified URLs.
+
+This is an ongoing exercise, not a one-time pass — the next round should
+sample Keywords, Backlinks, and remaining Local SEO findings the same
+way.
+
 ## Architecture notes worth knowing before changing things
 - `auth.config.ts` is deliberately Prisma-free — shared with
   `middleware.ts`, which runs on Vercel's Edge Runtime and can't run
