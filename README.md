@@ -95,7 +95,8 @@ citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 `/performance` (CWV) · `/internal-links` · `/content` (LLM content
 review) · `/ai-search` (AI Search Readiness) · `/keywords` (rank tracking + cannibalization + decay + CTR
 rewrites) · `/content-stacks` · `/backlinks` · `/reports` (monthly
-client report) · `/login`
+client report) · `/project-tracker` (phase/task board for following this
+app's own build progress — see Project Tracker section below) · `/login`
 
 The Backlinks, Keywords, and Indexation pages' biggest tables (150, 117,
 182+ rows) use `components/FilterableTable.tsx` — a client-side search
@@ -153,6 +154,24 @@ npx tsx scripts/runBacklinksCheck.ts [domain] [competitor1,competitor2,...]
   pearlplasticsurgery.com, olymedspa.com) — algorithmic competitor
   discovery was tried and rejected (surfaced Facebook/Instagram/YouTube,
   not real local competitors).
+
+## Project Tracker
+`/project-tracker` is a live phase/task board (`ProjectPhase`/`ProjectTask`
+models, deliberately separate from `Site`/`Finding` — it tracks this
+tool's own development, not a client's SEO) so progress can be followed
+without reading git log or README diffs. Seeded via
+`scripts/seedProjectTracker.ts` (safe to re-run — the upsert never
+overwrites an existing row's status, only adds new phases/tasks).
+
+Task status gets updated from the command line as work lands, not by
+hand-editing the UI:
+```
+npx tsx scripts/markTask.ts task <phaseKey> "<title-substring>" DONE
+npx tsx scripts/markTask.ts phase <phaseKey> COMPLETE
+npx tsx scripts/markTask.ts add <phaseKey> "<new task title>"
+```
+The UI also has Mark done/Undo buttons for manual use (same server-action
+pattern as the Action Plan's finding buttons).
 
 ## Accuracy audit (2026-08-21)
 Prompted by a direct question: "is this app properly giving the right SEO
