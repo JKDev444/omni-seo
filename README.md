@@ -41,7 +41,7 @@ exists for going deep on one specific thing.
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
 | M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, and systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates) are live, part of every crawl. Not built: schema-vs-visible-content mismatch, schema-URL-redirect checks, and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
-| P | Guided Roadmap (`/action-plan`) | **Live** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page. Not built: 30/60/90-day framing, platform-specific exact fix instructions beyond what Finding.fixType already gives |
+| P | Guided Roadmap (`/action-plan`) | **Live** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page, with in-app buttons to mark a finding done/ignored/false-positive (a server action, `lib/actions/findingActions.ts`). Status carries forward across crawls (`lib/findings/createFinding.ts` checks the prior crawl for a matching finding and carries IGNORED/FALSE_POSITIVE/ACCEPTED onto the new one — COMPLETED deliberately does not carry forward, so a still-broken issue resurfaces as a real regression instead of staying hidden). Not built: 30/60/90-day framing, platform-specific exact fix instructions beyond what Finding.fixType already gives |
 
 Not started: N (AI Search Readiness), O (Shopify/e-commerce specifics), Q
 (Reporting), R (Automation/Cron/regression detection), S (Auto-fix/
@@ -122,6 +122,19 @@ npx tsx scripts/runBacklinksCheck.ts [domain] [competitor1,competitor2,...]
   exists.
 - `MAX_PAGES = 200` in `lib/crawler/crawl.ts` is a safety ceiling for the
   current single-domain v1 scope.
+- **Don't run `npm run build` while `npm run dev` is running against the
+  same `.next` folder** — dev and prod builds use incompatible structures
+  there, and it corrupts the running dev server's module map (real,
+  repeated incident this session — symptoms look like
+  `Cannot find module './NNN.js'` or `__webpack_modules__[moduleId] is
+  not a function`). Fix is always `rm -rf .next` + restart, never a code
+  bug when it happens.
+- A `qa-test@internal.local` login account exists (created via
+  `scripts/createUser.ts`) for browser-based UI verification without
+  needing the real account's credentials. Delete it with
+  `npx tsx scripts/deleteUser.ts qa-test@internal.local` once it's no
+  longer needed, or leave it — it's a normal login account like any
+  other, no special privileges.
 
 ## Local development
 ```bash
