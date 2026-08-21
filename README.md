@@ -1,91 +1,140 @@
 # Omni SEO — Internal Local SEO Audit Tool
 
-Built for omnicenters.com. Custom crawler + GSC/GA4 integration + dashboard,
-replacing SearchAtlas with a purpose-built internal tool per the audit
-methodology in the SEO_System reference docs.
+Built for omnicenters.com (medical aesthetics/wellness clinic, Tumwater/
+Olympia/Lacey WA), replacing SearchAtlas ($99/mo) with a purpose-built
+internal tool. Custom crawler + live GSC/GA4/DataForSEO/Anthropic
+integrations + a multi-page dashboard, following the audit methodology in
+`docs/SEO_System/` (gitignored reference material, not app content).
+
+**This file is the up-to-date technical status of the app** — kept current
+after every phase so it can be dropped into another tool (ChatGPT, Lovable,
+a new Claude session) to get oriented fast. If you're reading this to get
+context: this is the whole picture as of the last commit.
 
 ## Stack
-Next.js (App Router) → GitHub → Vercel (hosting + Cron) → Neon Postgres → NextAuth
+Next.js 15 (App Router) → GitHub (JKDev444/omni-seo) → Vercel (hosting +
+Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login)
 
-## What's built so far
-- `prisma/schema.prisma` — full data model (Sites, Pages, Crawls, Findings,
-  Scorecard, Citations, Maintenance Tasks, Client Reports, GSC/GA4 cache,
-  GBP profile cache)
-- `lib/checks/onPageChecks.ts` — Steps 1, 2, 4 audit logic (raw HTML,
-  indexability, schema-by-page-type) straight from Exact_Audit_Methodology.md
-- `lib/crawler/crawl.ts` — the crawler: robots.txt respect (properly scoped
-  by User-agent), sitemap discovery, rate-limit-safe fetching with retry/
-  backoff, duplicate-title detection across the whole site
-- `lib/localSeo/` — Step 5 NAP consistency check (footer vs. schema vs. GBP)
-- `lib/integrations/places.ts` — GBP public data pull via Places API
-- `lib/citations/`, `lib/maintenance/` — Citation Tracker and Monthly
-  Maintenance defaults, sourced exactly from docs/SEO_System/
-- `app/(app)/dashboard/` — dashboard UI (health rings, findings, scorecard,
-  citation tracker, maintenance tracker)
-- `auth.ts`, `auth.config.ts`, `middleware.ts`, `app/login/` — NextAuth
-  username/password login (Credentials provider). No public signup route —
-  `scripts/createUser.ts` is the only way to create an account, so the
-  `User` table is the allowlist. `auth.config.ts` is a deliberately
-  Prisma-free config shared with `middleware.ts`, since Vercel's Edge
-  Runtime (where middleware runs) can't run Prisma Client.
-- `styles/tokens.css` — design system (brand-anchored palette, type scale)
+## Status: Phases A–L complete
 
-## What's next
-See the phased roadmap (Phases 2-7: content depth, image/CWV, platform/
-e-commerce checks, GSC+GA4+GBP live data, guided roadmap & reporting,
-automation) — ask Claude for the current phase status.
+| Phase | What it is | Status |
+|---|---|---|
+| A | Auth (NextAuth Credentials, no public signup) | Live |
+| B | Data foundation (crawl snapshots, Finding model, multi-dimensional scoring) | Live |
+| C | Technical SEO engine (redirects, canonicals, robots, duplicate titles/meta, thin content) | Live |
+| D | GSC + GA4 analytics (`/analytics`) | Live, real data |
+| E | Indexation Control Center (`/indexation`) — Google's real index status per URL | Live, real data |
+| F | Core Web Vitals (`/performance`) — CrUX field data + PSI lab data | Live (CrUX has no field data for this site — see Known limitations) |
+| G | Internal Link Graph (`/internal-links`) | Live, real data |
+| H | Content Depth / E-E-A-T, LLM-assisted (`/content`) | Live, real data |
+| I | Keyword rank tracking, cannibalization, decay, CTR opportunities (`/keywords`) | Live, real data |
+| J | Content Stacks / topical authority (`/content-stacks`) | Live, real data |
+| K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
+| L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
 
----
+Not started: M (Schema Validation Engine), N (AI Search Readiness), O
+(Shopify/e-commerce specifics), P (Guided Roadmap), Q (Reporting), R
+(Automation/Cron/regression detection), S (Auto-fix/agentic remediation).
 
-## Setup checklist (do these in order)
+## Pages in the app
+`/dashboard` (health rings, findings, scorecard, citations, maintenance) ·
+`/analytics` (GSC+GA4) · `/indexation` · `/performance` (CWV) ·
+`/internal-links` · `/content` (LLM content review) · `/keywords` (rank
+tracking + cannibalization + decay + CTR rewrites) · `/content-stacks` ·
+`/backlinks` · `/login`
 
-### 1. Create a GitHub repo
-- github.com → New repository → name it `omni-seo` → private
-- Push this code once you have it locally (I'll hand you the full repo
-  when the build is further along, or we can do this incrementally)
+## Integrations and what each needs
 
-### 2. Create a Neon Postgres database (free tier)
-- neon.tech → New Project → copy the connection string
-- This becomes your `DATABASE_URL` environment variable
+| Integration | Env var(s) | Used for |
+|---|---|---|
+| Neon Postgres | `DATABASE_URL` | Everything |
+| NextAuth | `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | Login |
+| Google service account | `GOOGLE_SERVICE_ACCOUNT_KEY` (base64 JSON) | GSC search analytics, GSC URL Inspection, GA4 — add the service account's email as a user on the Search Console property and GA4 property directly, no OAuth consent screen |
+| PageSpeed Insights + CrUX | `GOOGLE_PAGESPEED_API_KEY` | Core Web Vitals (`/performance`) — same key covers both APIs; both must be enabled in Cloud Console, and the key's API restrictions (if any) must explicitly allow both |
+| Places API (New) | `GOOGLE_PLACES_API_KEY` | Public GBP data (rating, reviews, hours, NAP) — `Site.gbpPlaceId` must be set (real Place ID, look it up via `places:searchText`) |
+| Anthropic (Claude Haiku) | `ANTHROPIC_API_KEY` | Content review (`/content`), CTR rewrite suggestions, content-stack topic clustering — every call here is a real per-request cost |
+| DataForSEO | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | Keyword rank tracking, keyword volume, backlinks — pay-as-you-go, basic auth, real per-request cost |
 
-### 3. Create a Vercel account and connect the GitHub repo
-- vercel.com → Import Project → select the `omni-seo` repo
-- Add environment variables: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
-- Deploy, then create a login account: `npx tsx scripts/createUser.ts <email> <password>`
-  (run locally against the production `DATABASE_URL`, or via `vercel exec` —
-  there's no signup UI on purpose)
+`Site.dataForSeoLocationCode` (currently `1027784` = Tumwater, WA) and
+`Site.dataForSeoLanguageCode` control where rank checks are targeted.
 
-### 4. Google Cloud (only needed later, for GSC/GA4/GBP data — not login)
-- console.cloud.google.com → New Project → name it "Omni SEO Tool"
-- Enable APIs as each integration phase needs them: **Search Console API**,
-  **Google Analytics Data API**, **Places API (New)**
-- GSC + GA4 will use a **service account** (no OAuth consent screen needed —
-  add the service account's email as a user on the Search Console property
-  and the GA4 property directly)
-- GBP (Business Profile API) needs a one-time OAuth grant from whoever
-  manages the actual listing, and separate Google approval for API access
+## Manual sync scripts (Vercel Cron will call these once Phase R exists)
+```
+npx tsx scripts/runCrawl.ts [domain]                    # full crawl — sitemap discovery, on-page checks, internal link graph
+npx tsx scripts/syncAnalytics.ts [domain]                # GSC + GA4
+npx tsx scripts/runIndexationCheck.ts [domain]           # URL Inspection API for every crawled page
+npx tsx scripts/runCoreWebVitalsCheck.ts [domain]        # CrUX (all pages) + PSI (homepage only)
+npx tsx scripts/runContentAnalysis.ts [domain] [maxPages] # LLM content review, real API cost
+npx tsx scripts/runCtrRewrites.ts [domain]               # LLM title/meta rewrites for CTR-opportunity pages
+npx tsx scripts/runContentStackClustering.ts [domain]    # LLM topical clustering, replaces all existing stacks
+npx tsx scripts/seedKeywords.ts suggest [domain]         # preview GSC-derived keyword suggestions (no writes)
+npx tsx scripts/seedKeywords.ts accept [domain] "phrase" # add specific keywords to tracking
+npx tsx scripts/runKeywordRankings.ts [domain]           # live SERP rank check for all active tracked keywords
+npx tsx scripts/retryFailedRankings.ts [domain]          # retry only keywords with no ranking data yet
+npx tsx scripts/runGbpProfilePull.ts [domain]            # public GBP data via Places API
+npx tsx scripts/runBacklinksCheck.ts [domain] [competitor1,competitor2,...]
+```
 
-### 5. Point a subdomain (optional, e.g. seo.omnicenters.com)
-- In wherever your DNS is managed, add a CNAME record pointing to
-  `cname.vercel-dns.com`, then add the domain in Vercel's project settings
+## Known limitations (real, not bugs)
+- **No CrUX field data for this site.** omnicenters.com's real-user Chrome
+  traffic volume is below CrUX's publish threshold, at both the URL and
+  origin level — confirmed directly against the API, not a code issue.
+  PSI Lighthouse lab data still works fine (`/performance` homepage score
+  + top opportunities).
+- **GBP Performance API not connected** (impressions/calls/clicks from the
+  GBP listing itself, in-app review replies) — deliberately skipped per
+  user decision on 2026-08-21; Places API (public GBP data) covers
+  everything else Local SEO needs.
+- Competitor set for Phase L is a fixed list of 5 real local competitors
+  (dermamedispa.com, rejuvenateolympia.com, skinmvmt.com,
+  pearlplasticsurgery.com, olymedspa.com) — algorithmic competitor
+  discovery was tried and rejected (surfaced Facebook/Instagram/YouTube,
+  not real local competitors).
 
-### 6. Set up the Vercel Cron job for scheduled crawls
-- `vercel.json` will define the schedule (weekly, matching your Week 1
-  Technical Crawl cadence) — added once the crawl API route is built
-
----
+## Architecture notes worth knowing before changing things
+- `auth.config.ts` is deliberately Prisma-free — shared with
+  `middleware.ts`, which runs on Vercel's Edge Runtime and can't run
+  Prisma Client. `auth.ts` (full config, DB-backed) is Node-runtime only.
+- Every external API call in `lib/integrations/` uses
+  `AbortSignal.timeout(...)` (or a `timeout` option for `googleapis` SDK
+  calls) — a hung request on a bad day should never be able to stall an
+  entire crawl or batch job silently. This was a real incident (see git
+  history: `fetchWithRedirects.ts` had none until a hardening pass).
+- LLM-assisted features (content review, CTR rewrites, content-stack
+  clustering) cache their output per URL/page and are only re-run
+  explicitly — never on every page load, since each call is a real cost.
+- The crawler discovers pages via sitemap.xml first (recursing one level
+  into sitemap index files, matched on the URL's *pathname* ending in
+  `.xml` — not the raw string, since Shopify's dynamic sub-sitemaps carry
+  a query string), falling back to just the homepage if no sitemap
+  exists.
+- `MAX_PAGES = 200` in `lib/crawler/crawl.ts` is a safety ceiling for the
+  current single-domain v1 scope.
 
 ## Local development
 ```bash
 npm install
 npm run db:push                                        # sync Prisma schema to your database
-npx tsx scripts/createUser.ts you@example.com password  # create a login account
+npx tsx scripts/createUser.ts you@example.com password  # create a login account (no public signup route)
 npm run dev                                             # starts local server at localhost:3000
 ```
 
-## Environment variables needed
+## Environment variables (full list)
 ```
 DATABASE_URL=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
+ANTHROPIC_API_KEY=
+DATAFORSEO_LOGIN=
+DATAFORSEO_PASSWORD=
+GOOGLE_SERVICE_ACCOUNT_KEY=
+GOOGLE_PAGESPEED_API_KEY=
+GOOGLE_PLACES_API_KEY=
 ```
+All of the above must also be set in Vercel's project environment
+variables for production, separately from local `.env`.
+
+## Deployment
+- Push to `main` → Vercel auto-deploys.
+- No Cron job wired up yet (Phase R) — all sync scripts above are run
+  manually for now.
