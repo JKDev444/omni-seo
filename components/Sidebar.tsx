@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/dashboard#scorecard", label: "Scorecard" },
   { href: "/dashboard#citations", label: "Citations" },
   { href: "/dashboard#maintenance", label: "Maintenance" },
+  { href: "/reports", label: "Reports" },
 ];
 
 export function Sidebar({

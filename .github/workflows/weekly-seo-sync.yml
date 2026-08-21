@@ -38,3 +38,5 @@ jobs:
         run: npx tsx scripts/runCoreWebVitalsCheck.ts omnicenters.com
       - name: Keyword rank checks
         run: npx tsx scripts/runKeywordRankings.ts omnicenters.com
+      - name: Update Scorecard (real computed values, no extra API cost)
+        run: npx tsx scripts/updateScorecard.ts omnicenters.com

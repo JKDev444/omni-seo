@@ -292,6 +292,8 @@ model ClientReport {
   leadsConversions     String?
   nextMonthPriorities  String?
   createdAt            DateTime @default(now())
+
+  @@unique([siteId, month])
 }
 
 // Cached pulls from Google Search Console API (Search Analytics query

@@ -39,3 +39,5 @@ jobs:
         run: npx tsx scripts/runContentStackClustering.ts omnicenters.com
       - name: Backlinks + competitor gap (real DataForSEO API cost)
         run: npx tsx scripts/runBacklinksCheck.ts omnicenters.com
+      - name: Generate monthly client report (real Anthropic API cost)
+        run: npx tsx scripts/generateClientReport.ts omnicenters.com
