@@ -88,18 +88,22 @@ export async function inspectUrl(siteId: string, url: string): Promise<Inspectio
 }
 
 /** Inspects every currently-known page for a site, respecting the API's per-minute quota. */
-export async function inspectAllPages(siteId: string): Promise<{ ok: boolean; inspected: number; errors: number; message?: string }> {
+export async function inspectAllPages(
+  siteId: string
+): Promise<{ ok: boolean; inspected: number; errors: number; errorDetails: { url: string; message: string }[]; message?: string }> {
   const pages = await prisma.page.findMany({ where: { siteId }, select: { url: true } });
   let inspected = 0;
   let errors = 0;
+  const errorDetails: { url: string; message: string }[] = [];
 
   for (const { url } of pages) {
     const result = await inspectUrl(siteId, url);
     if (!result.ok) {
       if (result.reason === "missing_credentials" || result.reason === "missing_site_url") {
-        return { ok: false, inspected, errors, message: result.message };
+        return { ok: false, inspected, errors, errorDetails, message: result.message };
       }
       errors++;
+      errorDetails.push({ url, message: result.message });
       continue;
     }
 
@@ -135,5 +139,5 @@ export async function inspectAllPages(siteId: string): Promise<{ ok: boolean; in
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  return { ok: true, inspected, errors };
+  return { ok: true, inspected, errors, errorDetails };
 }
