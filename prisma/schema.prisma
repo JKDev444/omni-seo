@@ -93,6 +93,8 @@ model Site {
   keywords    Keyword[]
   ctrRewriteSuggestions CtrRewriteSuggestion[]
   contentStacks ContentStack[]
+  backlinkProfiles BacklinkProfile[]
+  backlinkGapDomains BacklinkGapDomain[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -411,6 +413,47 @@ model ContentAnalysis {
   fetchedAt           DateTime @default(now())
 
   @@unique([siteId, url])
+}
+
+// Cached DataForSEO Backlinks Summary — one row per domain (our own,
+// isOwnDomain=true, plus each tracked competitor). Full history kept (not
+// just latest) so backlink growth/decline is visible over time, same
+// pattern as GscMetric/KeywordRanking.
+model BacklinkProfile {
+  id                       String   @id @default(cuid())
+  siteId                   String
+  site                     Site     @relation(fields: [siteId], references: [id])
+  domain                   String
+  isOwnDomain              Boolean  @default(false)
+  rank                     Int?
+  backlinks                Int?
+  referringDomains         Int?
+  referringDomainsNofollow Int?
+  brokenBacklinks          Int?
+  spamScore                Int?
+  firstSeen                DateTime?
+  fetchedAt                DateTime @default(now())
+
+  @@index([siteId, domain, fetchedAt])
+}
+
+// A referring domain that links to a tracked competitor but not to us —
+// recomputed client-side from each domain's referring-domains list (not
+// DataForSEO's domain_intersection endpoint, whose gap-mode syntax
+// couldn't be verified against real behavior) so the result is a set
+// difference we can trust, not undocumented API behavior. Replaced
+// wholesale on each run, same pattern as ContentStack clustering.
+model BacklinkGapDomain {
+  id                  String   @id @default(cuid())
+  siteId              String
+  site                Site     @relation(fields: [siteId], references: [id])
+  competitorDomain    String
+  referringDomain     String
+  referringDomainRank Int?
+  backlinksToCompetitor Int?
+  fetchedAt           DateTime @default(now())
+
+  @@index([siteId, competitorDomain])
 }
 
 enum ContentStackRole {

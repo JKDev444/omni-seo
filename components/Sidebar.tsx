@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/content", label: "Content Quality" },
   { href: "/keywords", label: "Keywords" },
   { href: "/content-stacks", label: "Content Stacks" },
+  { href: "/backlinks", label: "Backlinks" },
   { href: "/dashboard#findings", label: "Findings" },
   { href: "/dashboard#scorecard", label: "Scorecard" },
   { href: "/dashboard#citations", label: "Citations" },
