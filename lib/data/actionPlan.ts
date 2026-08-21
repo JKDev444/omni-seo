@@ -7,17 +7,13 @@
  * user to piece one together from a dozen separate reports.
  */
 import { prisma } from "@/lib/db";
-import type { Finding, Page, Priority } from "@prisma/client";
+import type { Priority } from "@prisma/client";
 import { V1_DOMAIN } from "@/lib/data/dashboard";
 import { getActiveMaintenanceWeek } from "@/lib/maintenance/seedMonth";
 import { getContentStackCompleteness } from "@/lib/data/contentStacks";
+import { getOpenFindingsForSite, type FindingWithPage } from "@/lib/findings/getOpenFindings";
 
-export type FindingWithPage = Finding & { page: Page | null };
-
-const CLOSED_STATUSES = new Set(["COMPLETED", "ALREADY_COMPLETED", "VERIFIED", "IGNORED", "FALSE_POSITIVE", "ACCEPTED"]);
-function isOpen(f: Finding): boolean {
-  return !CLOSED_STATUSES.has(f.status);
-}
+export type { FindingWithPage };
 
 export interface CtrRewriteAction {
   url: string;
@@ -73,14 +69,7 @@ export async function getActionPlanData(): Promise<ActionPlanData> {
 
   const latestCrawl = await prisma.crawl.findFirst({ where: { siteId: site.id, status: "completed" }, orderBy: { startedAt: "desc" } });
 
-  const allFindings = latestCrawl
-    ? await prisma.finding.findMany({
-        where: { crawlId: latestCrawl.id },
-        include: { page: true },
-        orderBy: [{ priority: "asc" }, { detectedAt: "desc" }],
-      })
-    : [];
-  const openFindings = allFindings.filter(isOpen);
+  const openFindings = await getOpenFindingsForSite(site.id);
 
   const byPriority: Record<Priority, FindingWithPage[]> = { CRITICAL: [], HIGH: [], MEDIUM: [], LOW: [] };
   for (const f of openFindings) byPriority[f.priority].push(f);
