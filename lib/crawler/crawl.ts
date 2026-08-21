@@ -118,7 +118,7 @@ function robotsPatternToRegExp(pattern: string): RegExp {
 async function fetchRobotsAllowedPaths(origin: string): Promise<(pathAndQuery: string) => boolean> {
   const allowAll = () => true;
   try {
-    const res = await fetch(`${origin}/robots.txt`, { headers: { "User-Agent": USER_AGENT } });
+    const res = await fetch(`${origin}/robots.txt`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return allowAll;
     const text = await res.text();
     const groups = parseRobotsGroups(text);
@@ -151,7 +151,7 @@ async function fetchRobotsAllowedPaths(origin: string): Promise<(pathAndQuery: s
 
 async function fetchSitemapUrls(origin: string): Promise<string[]> {
   try {
-    const res = await fetch(`${origin}/sitemap.xml`, { headers: { "User-Agent": USER_AGENT } });
+    const res = await fetch(`${origin}/sitemap.xml`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return [];
     const xml = await res.text();
     const $ = cheerio.load(xml, { xmlMode: true });
@@ -173,7 +173,7 @@ async function fetchSitemapUrls(origin: string): Promise<string[]> {
     const directUrls = urls.filter((u) => !isXmlSitemap(u));
     for (const sub of subSitemaps.slice(0, 10)) {
       try {
-        const subRes = await fetch(sub, { headers: { "User-Agent": USER_AGENT } });
+        const subRes = await fetch(sub, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) });
         const subXml = await subRes.text();
         const $$ = cheerio.load(subXml, { xmlMode: true });
         $$("loc").each((_, el) => { directUrls.push($$(el).text().trim()); });

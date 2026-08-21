@@ -24,25 +24,28 @@ export async function pullGa4Metrics(siteId: string, days = 90): Promise<Ga4Pull
   try {
     const propertyResource = site.ga4PropertyId.startsWith("properties/") ? site.ga4PropertyId : `properties/${site.ga4PropertyId}`;
 
-    const res = await analyticsdata.properties.runReport({
-      property: propertyResource,
-      requestBody: {
-        dateRanges: [{ startDate: `${days}daysAgo`, endDate: "today" }],
-        dimensions: [
-          { name: "date" },
-          { name: "pagePath" },
-          { name: "sessionDefaultChannelGroup" },
-          { name: "deviceCategory" },
-        ],
-        metrics: [
-          { name: "sessions" },
-          { name: "activeUsers" },
-          { name: "engagedSessions" },
-          { name: "conversions" },
-        ],
-        limit: "25000",
+    const res = await analyticsdata.properties.runReport(
+      {
+        property: propertyResource,
+        requestBody: {
+          dateRanges: [{ startDate: `${days}daysAgo`, endDate: "today" }],
+          dimensions: [
+            { name: "date" },
+            { name: "pagePath" },
+            { name: "sessionDefaultChannelGroup" },
+            { name: "deviceCategory" },
+          ],
+          metrics: [
+            { name: "sessions" },
+            { name: "activeUsers" },
+            { name: "engagedSessions" },
+            { name: "conversions" },
+          ],
+          limit: "25000",
+        },
       },
-    });
+      { timeout: 30_000 }
+    );
 
     const rows = res.data.rows ?? [];
     const startDate = new Date();

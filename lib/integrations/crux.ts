@@ -41,6 +41,7 @@ async function queryCrux(body: Record<string, unknown>, apiKey: string): Promise
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
   });
 }
 

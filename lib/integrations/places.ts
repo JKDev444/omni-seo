@@ -58,6 +58,7 @@ export async function fetchGbpPublicData(placeId: string | null | undefined): Pr
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": FIELD_MASK,
       },
+      signal: AbortSignal.timeout(20_000),
     });
 
     if (!res.ok) {

@@ -57,9 +57,10 @@ export async function inspectUrl(siteId: string, url: string): Promise<Inspectio
   const searchconsole = google.searchconsole({ version: "v1", auth: authResult.auth });
 
   try {
-    const res = await searchconsole.urlInspection.index.inspect({
-      requestBody: { inspectionUrl: url, siteUrl: site.gscSiteUrl },
-    });
+    const res = await searchconsole.urlInspection.index.inspect(
+      { requestBody: { inspectionUrl: url, siteUrl: site.gscSiteUrl } },
+      { timeout: 30_000 }
+    );
 
     const result = res.data.inspectionResult?.indexStatusResult;
     const verdict = result?.verdict ?? null;

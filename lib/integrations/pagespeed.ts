@@ -29,7 +29,10 @@ export async function fetchPageSpeedInsights(url: string, strategy: PsiStrategy)
 
   try {
     const params = new URLSearchParams({ url, strategy, key: apiKey, category: "performance" });
-    const res = await fetch(`${PSI_ENDPOINT}?${params.toString()}`);
+    // PSI legitimately takes 20-40s for a real Lighthouse run — a
+    // generous timeout avoids false-failing a slow-but-working request
+    // while still guarding against an indefinite hang.
+    const res = await fetch(`${PSI_ENDPOINT}?${params.toString()}`, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) {
       const body = await res.text();
       return { ok: false, reason: "api_error", message: `PageSpeed Insights API returned ${res.status}: ${body.slice(0, 300)}` };

@@ -38,15 +38,18 @@ export async function pullGscMetrics(siteId: string, days = 90): Promise<GscPull
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
   try {
-    const res = await searchconsole.searchanalytics.query({
-      siteUrl: site.gscSiteUrl,
-      requestBody: {
-        startDate: fmt(startDate),
-        endDate: fmt(endDate),
-        dimensions: ["date", "page", "query", "device", "country"],
-        rowLimit: 25000,
+    const res = await searchconsole.searchanalytics.query(
+      {
+        siteUrl: site.gscSiteUrl,
+        requestBody: {
+          startDate: fmt(startDate),
+          endDate: fmt(endDate),
+          dimensions: ["date", "page", "query", "device", "country"],
+          rowLimit: 25000,
+        },
       },
-    });
+      { timeout: 30_000 }
+    );
 
     const rows = (res.data.rows ?? []) as GscRow[];
 

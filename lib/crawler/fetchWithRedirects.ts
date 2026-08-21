@@ -23,14 +23,20 @@ export interface FetchResult {
   xRobotsTag: string | null;
 }
 
+// A hung request on one page must not stall an entire multi-hundred-page
+// crawl indefinitely — the existing try/catch in fetchWithRedirects
+// already treats a thrown fetch error as "this page failed" (status 0),
+// so a timeout here degrades gracefully rather than needing new handling.
+const REQUEST_TIMEOUT_MS = 20_000;
+
 async function fetchOnce(url: string): Promise<Response> {
-  let res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, redirect: "manual" });
+  let res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, redirect: "manual", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   for (const fallbackBackoffMs of RETRY_BACKOFFS_MS) {
     if (res.status !== 429 && res.status !== 503) break;
     const retryAfterHeader = Number(res.headers.get("retry-after"));
     const backoffMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : fallbackBackoffMs;
     await new Promise((r) => setTimeout(r, backoffMs));
-    res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, redirect: "manual" });
+    res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, redirect: "manual", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   }
   return res;
 }
