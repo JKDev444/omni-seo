@@ -26,7 +26,7 @@ import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
 import { createFindingRecord } from "../findings/createFinding";
 import { extractInternalLinks } from "./extractLinks";
 import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
-import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck } from "../checks/schemaValidation";
+import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, type SchemaGap } from "../checks/schemaValidation";
 
 const prisma = new PrismaClient();
 
@@ -266,6 +266,7 @@ export async function crawlSite(siteId: string, domain: string) {
     const urlToPageId = new Map<string, string>();
     const pagesWithCanonicals: { url: string; canonical: string }[] = [];
     const pagesWithLocalBusinessIds: { url: string; id: string | null; hasLocalBusinessSchema: boolean }[] = [];
+    const pagesWithSchemaGaps: { url: string; gaps: SchemaGap[] }[] = [];
 
     for (const { url, html, renderedHtml, status, pageType, fetchResult } of pageResults) {
       const $ = cheerio.load(html);
@@ -336,6 +337,7 @@ export async function crawlSite(siteId: string, domain: string) {
         findings.push(...runSchemaRequiredPropertiesCheck(html));
         const localBusinessId = extractLocalBusinessId(html);
         pagesWithLocalBusinessIds.push({ url, id: localBusinessId, hasLocalBusinessSchema: localBusinessId !== null });
+        pagesWithSchemaGaps.push({ url, gaps: detectSchemaGaps(html) });
       }
       if (renderedHtml) {
         findings.push(...runRenderComparisonChecks(html, renderedHtml));
@@ -361,6 +363,14 @@ export async function crawlSite(siteId: string, domain: string) {
     for (const { url, finding } of runLocalBusinessIdConsistencyCheck(pagesWithLocalBusinessIds)) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
+      totalFindings++;
+    }
+
+    // Sitewide schema gap pattern detection — attached to the homepage
+    // since it's a site-level issue (one shared template), not any single
+    // page's problem, same reasoning as the Local SEO NAP check.
+    for (const finding of runSystemicSchemaGapCheck(pagesWithSchemaGaps)) {
+      await createFindingRecord(crawl.id, homepage?.pageId ?? null, finding);
       totalFindings++;
     }
 

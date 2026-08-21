@@ -61,9 +61,14 @@ function parseSchemaBlocks(rawHtml: string): ParsedSchemaBlock[] {
   return blocks;
 }
 
-/** Per-page: flags schema blocks missing properties Google treats as required/strongly recommended for that type. */
-export function runSchemaRequiredPropertiesCheck(rawHtml: string): RawFinding[] {
-  const findings: RawFinding[] = [];
+export interface SchemaGap {
+  type: string;
+  missing: string[];
+}
+
+/** Extracts, per schema type present on the page, which required properties are missing (or []). Shared by the per-page and sitewide-aggregate checks below so both work from one parse. */
+export function detectSchemaGaps(rawHtml: string): SchemaGap[] {
+  const gaps: SchemaGap[] = [];
   const blocks = parseSchemaBlocks(rawHtml);
 
   for (const block of blocks) {
@@ -76,23 +81,69 @@ export function runSchemaRequiredPropertiesCheck(rawHtml: string): RawFinding[] 
         return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
       });
 
-      if (missing.length > 0) {
-        // FAQPage is explicitly de-emphasized per the confirmed May/June/
-        // August 2026 rich-result deprecation — still worth flagging as a
-        // content-quality/LLM-extractability signal, just not at the same
-        // priority as an entity Google actually renders in search.
-        const priority = type === "FAQPage" ? "LOW" : missing.length === required.length ? "HIGH" : "MEDIUM";
-        findings.push({
-          category: "schema",
-          checkStep: "Schema Validation - Required Properties",
-          title: `${type} schema missing required propert${missing.length > 1 ? "ies" : "y"}`,
-          description: `Missing: ${missing.join(", ")}. Google's structured data guidelines treat these as required for ${type} to be eligible for rich results.`,
-          fixType: `Add the missing propert${missing.length > 1 ? "ies" : "y"} (${missing.join(", ")}) to the ${type} JSON-LD block.`,
-          priority,
-          fixLocation: "Theme Liquid",
-        });
-      }
+      if (missing.length > 0) gaps.push({ type, missing });
     }
+  }
+
+  return gaps;
+}
+
+/** Per-page: flags schema blocks missing properties Google treats as required/strongly recommended for that type. */
+export function runSchemaRequiredPropertiesCheck(rawHtml: string): RawFinding[] {
+  return detectSchemaGaps(rawHtml).map(({ type, missing }) => {
+    // FAQPage is explicitly de-emphasized per the confirmed May/June/
+    // August 2026 rich-result deprecation — still worth flagging as a
+    // content-quality/LLM-extractability signal, just not at the same
+    // priority as an entity Google actually renders in search.
+    const required = REQUIRED_PROPERTIES[type];
+    const priority = type === "FAQPage" ? "LOW" : missing.length === required.length ? "HIGH" : "MEDIUM";
+    return {
+      category: "schema",
+      checkStep: "Schema Validation - Required Properties",
+      title: `${type} schema missing required propert${missing.length > 1 ? "ies" : "y"}`,
+      description: `Missing: ${missing.join(", ")}. Google's structured data guidelines treat these as required for ${type} to be eligible for rich results.`,
+      fixType: `Add the missing propert${missing.length > 1 ? "ies" : "y"} (${missing.join(", ")}) to the ${type} JSON-LD block.`,
+      priority,
+      fixLocation: "Theme Liquid",
+    };
+  });
+}
+
+const SYSTEMIC_GAP_THRESHOLD = 3;
+
+/**
+ * Sitewide: when the same schema type is missing the same property across
+ * many pages, that's near-certainly one shared Liquid template, not N
+ * separate content gaps — confirmed on this site: 84 Article pages were
+ * all missing "image", and every one of their og:image tags pointed at
+ * the exact same generic site logo, proving the template never sets a
+ * per-article image at all. One consolidated finding pointing at the
+ * shared template is far more actionable than 84 near-duplicate ones.
+ */
+export function runSystemicSchemaGapCheck(pages: { url: string; gaps: SchemaGap[] }[]): RawFinding[] {
+  const byKey = new Map<string, { type: string; missing: string[]; urls: string[] }>();
+
+  for (const { url, gaps } of pages) {
+    for (const gap of gaps) {
+      const key = `${gap.type}:${gap.missing.slice().sort().join(",")}`;
+      const entry = byKey.get(key) ?? { type: gap.type, missing: gap.missing, urls: [] };
+      entry.urls.push(url);
+      byKey.set(key, entry);
+    }
+  }
+
+  const findings: RawFinding[] = [];
+  for (const { type, missing, urls } of byKey.values()) {
+    if (urls.length < SYSTEMIC_GAP_THRESHOLD) continue;
+    findings.push({
+      category: "schema",
+      checkStep: "Schema Validation - Systemic Gap",
+      title: `${type} schema missing "${missing.join('", "')}" on ${urls.length} pages — shared template, not individual content gaps`,
+      description: `${urls.length} pages share the exact same ${type} schema gap (${missing.join(", ")}). This is almost certainly one shared Liquid template rather than ${urls.length} separate content edits — fixing the template fixes all ${urls.length} pages at once. Example pages: ${urls.slice(0, 5).join(", ")}${urls.length > 5 ? `, and ${urls.length - 5} more` : ""}.`,
+      fixType: `Find the shared ${type} JSON-LD Liquid snippet (likely one file, given it's identical across all ${urls.length} pages) and add the missing propert${missing.length > 1 ? "ies" : "y"}. If a per-page value isn't available (e.g. no per-article featured image), fall back to a sensible default rather than omitting it.`,
+      priority: "CRITICAL",
+      fixLocation: "Theme Liquid",
+    });
   }
 
   return findings;
