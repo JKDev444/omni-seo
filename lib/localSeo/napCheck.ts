@@ -49,6 +49,10 @@ function normalizeAddress(address: string | null): string | null {
   for (const [name, abbr] of Object.entries(STATE_NAME_TO_ABBR)) {
     normalized = normalized.replace(new RegExp(`\\b${name}\\b`, "g"), abbr);
   }
+  // The Places API's formattedAddress includes a trailing country name
+  // ("... 98501, USA") that footer/schema addresses never carry — without
+  // stripping it, every real GBP cross-check flags a false mismatch.
+  normalized = normalized.replace(/\s+(usa|united states( of america)?)\s*$/, "").trim();
   return normalized;
 }
 
