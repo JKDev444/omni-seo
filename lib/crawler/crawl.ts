@@ -26,6 +26,7 @@ import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
 import { createFindingRecord } from "../findings/createFinding";
 import { extractInternalLinks } from "./extractLinks";
 import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
+import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck } from "../checks/schemaValidation";
 
 const prisma = new PrismaClient();
 
@@ -264,6 +265,7 @@ export async function crawlSite(siteId: string, domain: string) {
     const allLinks: { sourceUrl: string; targetUrl: string; anchorText: string | null; isContextual: boolean }[] = [];
     const urlToPageId = new Map<string, string>();
     const pagesWithCanonicals: { url: string; canonical: string }[] = [];
+    const pagesWithLocalBusinessIds: { url: string; id: string | null; hasLocalBusinessSchema: boolean }[] = [];
 
     for (const { url, html, renderedHtml, status, pageType, fetchResult } of pageResults) {
       const $ = cheerio.load(html);
@@ -331,6 +333,9 @@ export async function crawlSite(siteId: string, domain: string) {
         const metaDesc = $('meta[name="description"]').attr("content")?.trim() ?? null;
         findings.push(...runDuplicateMetaDescriptionCheck(url, metaDesc, allMetaDescsOnSite));
         findings.push(...runThinContentCheck(url, html, pageType));
+        findings.push(...runSchemaRequiredPropertiesCheck(html));
+        const localBusinessId = extractLocalBusinessId(html);
+        pagesWithLocalBusinessIds.push({ url, id: localBusinessId, hasLocalBusinessSchema: localBusinessId !== null });
       }
       if (renderedHtml) {
         findings.push(...runRenderComparisonChecks(html, renderedHtml));
@@ -345,6 +350,15 @@ export async function crawlSite(siteId: string, domain: string) {
     // Sitewide canonical URL pattern consistency (protocol/www) — needs
     // every page's canonical before it can tell what the dominant pattern is.
     for (const { url, finding } of runCanonicalConsistencyCheck(pagesWithCanonicals)) {
+      const pageId = urlToPageId.get(url) ?? null;
+      await createFindingRecord(crawl.id, pageId, finding);
+      totalFindings++;
+    }
+
+    // Sitewide LocalBusiness/Organization @id consistency — same reasoning
+    // as canonical consistency: needs every page's entity @id before it
+    // can tell which one is the dominant, correct one.
+    for (const { url, finding } of runLocalBusinessIdConsistencyCheck(pagesWithLocalBusinessIds)) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
       totalFindings++;
