@@ -15,7 +15,7 @@ context: this is the whole picture as of the last commit.
 Next.js 15 (App Router) → GitHub (JKDev444/omni-seo) → Vercel (hosting +
 Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login)
 
-## Status: Phases A–M complete (M partial), P partial
+## Status: Phases A–L, N complete; F caveated, M/P/R partial; K deliberately skipped
 
 **The core intent of this app**: not just a pile of diagnostic reports —
 a tool that tells the user everything they need to do, on whatever
