@@ -12,9 +12,11 @@ const FORM_FACTORS: FormFactor[] = ["PHONE", "DESKTOP"];
  * run takes several seconds server-side, so running it against every
  * page in a site isn't practical, and CrUX is the priority signal anyway.
  */
-export async function pullCoreWebVitals(siteId: string): Promise<{ ok: boolean; pulled: number; noData: number; errors: number; findingsCreated: number; message?: string }> {
+export async function pullCoreWebVitals(
+  siteId: string
+): Promise<{ ok: boolean; pulled: number; noData: number; errors: number; errorDetails: { url: string; formFactor: string; message: string }[]; findingsCreated: number; message?: string }> {
   const pages = await prisma.page.findMany({ where: { siteId }, select: { id: true, url: true, pageType: true } });
-  if (pages.length === 0) return { ok: true, pulled: 0, noData: 0, errors: 0, findingsCreated: 0 };
+  if (pages.length === 0) return { ok: true, pulled: 0, noData: 0, errors: 0, errorDetails: [], findingsCreated: 0 };
 
   // Findings need a crawlId — attach CWV findings to the most recent
   // completed crawl, same as any other periodic (non-crawl-time) check.
@@ -23,6 +25,7 @@ export async function pullCoreWebVitals(siteId: string): Promise<{ ok: boolean; 
   let pulled = 0;
   let noData = 0;
   let errors = 0;
+  const errorDetails: { url: string; formFactor: string; message: string }[] = [];
   let findingsCreated = 0;
 
   for (const { id: pageId, url, pageType } of pages) {
@@ -30,9 +33,12 @@ export async function pullCoreWebVitals(siteId: string): Promise<{ ok: boolean; 
       const result = await fetchCruxData(url, formFactor);
 
       if (!result.ok) {
-        if (result.reason === "missing_api_key") return { ok: false, pulled, noData, errors, findingsCreated, message: result.message };
+        if (result.reason === "missing_api_key") return { ok: false, pulled, noData, errors, errorDetails, findingsCreated, message: result.message };
         if (result.reason === "no_data") noData++;
-        else errors++;
+        else {
+          errors++;
+          errorDetails.push({ url, formFactor, message: result.message });
+        }
         continue;
       }
 
@@ -83,7 +89,10 @@ export async function pullCoreWebVitals(siteId: string): Promise<{ ok: boolean; 
         }
       }
 
-      await new Promise((r) => setTimeout(r, 100));
+      // CrUX's real per-minute quota is well under the ~600/min this 100ms
+      // delay implied — 182 pages x 2 form factors blew through it and
+      // triggered mass 429s. 400ms keeps this comfortably under it.
+      await new Promise((r) => setTimeout(r, 400));
     }
 
     if (pageType === "HOMEPAGE") {
@@ -113,5 +122,5 @@ export async function pullCoreWebVitals(siteId: string): Promise<{ ok: boolean; 
     }
   }
 
-  return { ok: true, pulled, noData, errors, findingsCreated };
+  return { ok: true, pulled, noData, errors, errorDetails, findingsCreated };
 }

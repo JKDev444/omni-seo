@@ -36,13 +36,33 @@ interface CruxApiHistogramMetric {
   percentiles?: { p75?: number };
 }
 
+const RETRY_BACKOFFS_MS = [2000, 5000, 10000];
+
+// CrUX's per-minute quota is much lower than the other Google APIs used in
+// this project — a 100ms delay between calls (up to 600/min) blew straight
+// through it on a real 182-page site, turning what should have been
+// legitimate "no data" results into misleading api_error noise. Retrying
+// with backoff on 429 recovers cleanly instead of just failing once.
 async function queryCrux(body: Record<string, unknown>, apiKey: string): Promise<Response> {
-  return fetch(`${CRUX_ENDPOINT}?key=${apiKey}`, {
+  let res = await fetch(`${CRUX_ENDPOINT}?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(20_000),
   });
+
+  for (const backoffMs of RETRY_BACKOFFS_MS) {
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, backoffMs));
+    res = await fetch(`${CRUX_ENDPOINT}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20_000),
+    });
+  }
+
+  return res;
 }
 
 function parseMetrics(record: Record<string, CruxApiHistogramMetric>, isOriginFallback: boolean): CruxMetrics {
