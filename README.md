@@ -40,7 +40,7 @@ exists for going deep on one specific thing.
 | J | Content Stacks / topical authority (`/content-stacks`) | Live, real data |
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
-| M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, and systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates) are live, part of every crawl. Not built: schema-vs-visible-content mismatch, schema-URL-redirect checks, and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
+| M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates), and schema URL consistency (a page-describing entity's `url`/`mainEntityOfPage` should match that page's real URL — catches stale schema left behind after a URL restructure) are live, part of every crawl. Not built: schema-vs-visible-content mismatch and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
 | P | Guided Roadmap (`/action-plan`) | **Complete** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page, with in-app buttons to mark a finding done/ignored/false-positive (a server action, `lib/actions/findingActions.ts`). Status carries forward across crawls (`lib/findings/createFinding.ts` checks the prior crawl for a matching finding and carries IGNORED/FALSE_POSITIVE/ACCEPTED onto the new one — COMPLETED deliberately does not carry forward, so a still-broken issue resurfaces as a real regression instead of staying hidden). A 30/60/90-day roadmap section (`lib/data/roadmapPlan.ts`) buckets open findings by priority + estimated effort, not priority alone, so quick mechanical fixes don't wait behind slow content work. Every finding card also has an "Exactly where to fix this" expandable with the real Shopify Admin navigation path and steps, keyed off `Finding.fixLocation`'s actual vocabulary (confirmed against live data: Theme Liquid and Content rewrite account for nearly all of it) |
 
 | R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below) and regression detection are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. Not built: SEO change tracking (a full changelog of every field change, not just regressions), deployment verification gate |
@@ -209,9 +209,32 @@ Two real bugs found and fixed as a result:
   described as "Not applicable." Added a `UTILITY_PAGE` type with a
   slug-based exclusion list, verified against 7 real misclassified URLs.
 
+- Backlinks and remaining Local SEO were audited next: Backlinks' gap
+  logic (client-side set difference over real DataForSEO referring-domain
+  data) checked out on code review. Local SEO turned up one more real
+  bug: the Dashboard's Citation Tracker showed a hardcoded, fabricated
+  "NAP inconsistent" flag for Google Business Profile with a note
+  admitting "Sample data — not a live check" — rendering identically to
+  a genuine finding. Fixed by wiring it to the real NAP check
+  (`lib/localSeo/runLocalSeoAudit.ts`), same pattern as the Scorecard fix
+  above; directories with no real integration now show an honest
+  "Unchecked" state instead of invented data.
+- Building the Schema URL Consistency check (Phase M) produced a bug of
+  its own, caught by the same live-verification habit rather than
+  trusting the code once it typechecked: the first version checked
+  *every* schema type's `url` against the page's own URL, so
+  Organization/WebSite/Person schema — which correctly declare the org's
+  homepage, the site root, or an author's bio page, not the current page
+  — produced 654 false positives on the first crawl. Restricting it to
+  actually self-referencing types (Article, BlogPosting, Product,
+  Service, WebPage) dropped that to 28 genuine findings, and 640 of the
+  654 false positives auto-resolved to VERIFIED on their own via the
+  reconciliation mechanism above — the fix-verify-fix loop working as
+  designed, including on new code from the same session.
+
 This is an ongoing exercise, not a one-time pass — the next round should
-sample Keywords, Backlinks, and remaining Local SEO findings the same
-way.
+sample Keywords findings and Phase M's remaining schema-vs-content
+mismatch check the same way.
 
 ## Architecture notes worth knowing before changing things
 - `auth.config.ts` is deliberately Prisma-free — shared with
