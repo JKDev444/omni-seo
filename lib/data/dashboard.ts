@@ -2,8 +2,7 @@ import { prisma } from "@/lib/db";
 import type { Finding, Page, Priority } from "@prisma/client";
 import { getActiveMaintenanceWeek } from "@/lib/maintenance/seedMonth";
 import { getOpenFindingsForSite } from "@/lib/findings/getOpenFindings";
-
-export const V1_DOMAIN = "omnicenters.com";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export type FindingWithPage = Finding & { page: Page | null };
 
@@ -56,7 +55,7 @@ function scoreForFindings(findings: Finding[]): number {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
 
   const empty: DashboardData = {
     site: null,

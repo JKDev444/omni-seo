@@ -230,6 +230,25 @@ a {
   font-size: var(--text-sm);
 }
 
+.sidebar-site-select {
+  display: block;
+  width: 100%;
+  margin-bottom: 2px;
+  padding: 2px 0;
+  color: var(--color-ink-muted);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.sidebar-site-select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .main {
   padding: var(--space-6) var(--space-8);
   max-width: 1200px;

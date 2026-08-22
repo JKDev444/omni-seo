@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface BacklinkProfileRow {
   domain: string;
@@ -27,7 +27,7 @@ export interface BacklinksPageData {
 }
 
 export async function getBacklinksPageData(): Promise<BacklinksPageData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, profiles: [], gap: [] };
 
   // Latest profile per domain — profiles are kept historically, so take

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface ClientReportPageData {
   site: { id: string } | null;
@@ -17,7 +17,7 @@ export interface ClientReportPageData {
 }
 
 export async function getClientReportPageData(): Promise<ClientReportPageData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, reports: [] };
 
   const reports = await prisma.clientReport.findMany({ where: { siteId: site.id }, orderBy: { month: "desc" } });

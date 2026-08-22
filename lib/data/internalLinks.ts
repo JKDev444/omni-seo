@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 import { analyzeLinkGraph, type PageLinkStats, type LinkSuggestion } from "@/lib/checks/internalLinkGraph";
 
 export interface InternalLinksData {
@@ -12,7 +12,7 @@ export interface InternalLinksData {
 }
 
 export async function getInternalLinksData(): Promise<InternalLinksData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, hasData: false, stats: [], suggestions: [], orphanCount: 0, maxDepth: null };
 
   const latestCrawl = await prisma.crawl.findFirst({ where: { siteId: site.id, status: "completed" }, orderBy: { startedAt: "desc" } });

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 import { getContentStackCompleteness, type StackCompleteness } from "@/lib/data/contentStacks";
 
 export interface ContentStacksPageData {
@@ -9,7 +9,7 @@ export interface ContentStacksPageData {
 }
 
 export async function getContentStacksPageData(): Promise<ContentStacksPageData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, stacks: [], avgCompleteness: null };
 
   const stacks = await getContentStackCompleteness(site.id);

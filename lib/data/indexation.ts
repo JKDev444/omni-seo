@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface RichResultsIssueRow {
   richResultType: string;
@@ -36,7 +36,7 @@ export interface IndexationData {
 }
 
 export async function getIndexationData(): Promise<IndexationData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, connected: false, lastRunAt: null, counts: {}, mismatches: [], rows: [], richResultsFailures: [] };
 
   const inspections = await prisma.urlInspection.findMany({ where: { siteId: site.id }, orderBy: { url: "asc" } });

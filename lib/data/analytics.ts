@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface AnalyticsData {
   site: { id: string; gscSiteUrl: string | null; ga4PropertyId: string | null } | null;
@@ -32,7 +32,7 @@ function emptyAnalytics(site: AnalyticsData["site"]): AnalyticsData {
 }
 
 export async function getAnalyticsData(): Promise<AnalyticsData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return emptyAnalytics(null);
 
   const siteRef = { id: site.id, gscSiteUrl: site.gscSiteUrl, ga4PropertyId: site.ga4PropertyId };

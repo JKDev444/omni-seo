@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface CwvRow {
   url: string;
@@ -23,7 +23,7 @@ export interface CwvData {
 }
 
 export async function getCoreWebVitalsData(): Promise<CwvData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, connected: false, lastFetched: null, fieldRows: [], homepagePsi: null, summary: { good: 0, needsImprovement: 0, poor: 0 } };
 
   const rows = await prisma.coreWebVitals.findMany({ where: { siteId: site.id, source: "CRUX_FIELD" }, orderBy: { url: "asc" } });

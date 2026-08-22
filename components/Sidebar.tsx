@@ -1,4 +1,4 @@
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { SiteSwitcher } from "@/components/SiteSwitcher";
 
 const NAV_ITEMS = [
   { href: "/action-plan", label: "Action Plan" },
@@ -24,9 +24,13 @@ const NAV_ITEMS = [
 export function Sidebar({
   userEmail,
   signOutAction,
+  activeSite,
+  sites,
 }: {
   userEmail: string | null;
   signOutAction: () => Promise<void>;
+  activeSite: { id: string; domain: string; platform: string } | null;
+  sites: { id: string; domain: string }[];
 }) {
   return (
     <aside className="sidebar">
@@ -42,8 +46,18 @@ export function Sidebar({
         ))}
       </nav>
       <div className="sidebar-site">
-        <strong>{V1_DOMAIN}</strong>
-        Shopify · Ella 3.0
+        {activeSite ? (
+          <>
+            {sites.length > 1 ? (
+              <SiteSwitcher sites={sites} activeSiteId={activeSite.id} />
+            ) : (
+              <strong>{activeSite.domain}</strong>
+            )}
+            <span>{activeSite.platform}</span>
+          </>
+        ) : (
+          <strong>No site configured</strong>
+        )}
       </div>
       {userEmail && (
         <form action={signOutAction} className="sidebar-account">

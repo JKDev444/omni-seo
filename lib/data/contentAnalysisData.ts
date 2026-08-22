@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface ContentRow {
   url: string;
@@ -26,7 +26,7 @@ function avg(scores: (number | null)[]): number | null {
 }
 
 export async function getContentAnalysisData(): Promise<ContentAnalysisData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, hasData: false, rows: [], avgScore: null };
 
   const analyses = await prisma.contentAnalysis.findMany({ where: { siteId: site.id }, orderBy: { url: "asc" } });

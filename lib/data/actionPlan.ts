@@ -8,7 +8,7 @@
  */
 import { prisma } from "@/lib/db";
 import type { Priority } from "@prisma/client";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 import { getActiveMaintenanceWeek } from "@/lib/maintenance/seedMonth";
 import { getContentStackCompleteness } from "@/lib/data/contentStacks";
 import { getOpenFindingsForSite, type FindingWithPage } from "@/lib/findings/getOpenFindings";
@@ -57,7 +57,7 @@ export interface ActionPlanData {
 }
 
 export async function getActionPlanData(): Promise<ActionPlanData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) {
     return {
       site: null,

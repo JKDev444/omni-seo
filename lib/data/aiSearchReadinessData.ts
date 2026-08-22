@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface AiSearchReadinessRow {
   url: string;
@@ -25,7 +25,7 @@ function avg(scores: (number | null)[]): number | null {
 }
 
 export async function getAiSearchReadinessData(): Promise<AiSearchReadinessData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, hasData: false, rows: [], avgScore: null, answerBlockCoverage: null };
 
   const analyses = await prisma.aiSearchReadiness.findMany({ where: { siteId: site.id }, orderBy: { url: "asc" } });

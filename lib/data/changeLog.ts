@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 
 export interface ChangeLogEntry {
   id: string;
@@ -19,7 +19,7 @@ export interface ChangeLogData {
 const DEFAULT_LIMIT = 300;
 
 export async function getChangeLogData(limit = DEFAULT_LIMIT): Promise<ChangeLogData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, entries: [], totalCount: 0 };
 
   const [rows, totalCount] = await Promise.all([

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { V1_DOMAIN } from "@/lib/data/dashboard";
+import { getActiveSite } from "@/lib/data/activeSite";
 import { detectCannibalization, detectContentDecay, detectCtrOpportunities, type CannibalizationIssue, type ContentDecayIssue, type CtrOpportunity } from "@/lib/data/keywordAnalysis";
 
 export interface CtrRewriteRow {
@@ -37,7 +37,7 @@ export interface KeywordsPageData {
 }
 
 export async function getKeywordsPageData(): Promise<KeywordsPageData> {
-  const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
+  const site = await getActiveSite();
   if (!site) return { site: null, keywords: [], cannibalization: [], decay: [], ctrOpportunities: [], ctrRewrites: [] };
 
   const keywords = await prisma.keyword.findMany({
