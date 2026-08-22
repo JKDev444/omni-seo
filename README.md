@@ -58,6 +58,18 @@ Not started: S (Auto-fix/agentic remediation) — the long-term "find
 issue → generate a fix → open a PR" vision; not started intentionally,
 since everything before it should be solid first.
 
+## What's next (v2 scope, added 2026-08-22)
+Once the single-site A-S phase list above is solid, the plan is:
+
+| Phase | What it is | Why this order |
+|---|---|---|
+| T | Multi-Site Support | Onboard `esco-pacific.com` as a real second site. The database has been `siteId`-scoped from early on specifically for this — the work is replacing every page/data function's hardcoded `V1_DOMAIN` with real site selection (a switcher, not a new schema), plus verifying every page degrades gracefully for a site with little/no crawl history yet |
+| U | UI/UX Design Polish | A real design pass so the app feels like a modern SaaS product. Deliberately sequenced *after* multi-site, not before — building nav/layout for one site and then reworking it for a switcher would waste the polish pass |
+| V | Change Pacing / Drip-Feed Intelligence | Real research first (there's no authoritative API for "how fast is too fast" on SEO changes or backlink outreach — this is judgment, not a deterministic check), then a scheduling layer on top of the existing 30/60/90-day roadmap that spaces out *when* Action Plan items get surfaced |
+| W | AI Chat Assistant | A SearchAtlas-style chat ("What are today's tasks?") over the site's real Finding/Action Plan/Scorecard data. Sequenced last since it's only trustworthy once the underlying data is — which is what the ongoing accuracy audit has been building toward — and cheap to add on top of a stable, multi-site, polished app using the Anthropic integration already in place |
+
+Tracked in the Project Tracker (`/project-tracker`) alongside everything else.
+
 ## Automation
 
 Everything used to require manually running a script. Now split across

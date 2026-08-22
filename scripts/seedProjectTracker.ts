@@ -210,6 +210,51 @@ const PHASES: PhaseSeed[] = [
     tasks: [{ title: "Agentic auto-fix pipeline", status: TODO, notes: "Not started intentionally -- everything before it should be solid first" }],
   },
   {
+    key: "T",
+    name: "Multi-Site Support",
+    summary: "Onboard a second real site (esco-pacific.com) -- replace the hardcoded V1_DOMAIN with real site selection.",
+    status: ProjectPhaseStatus.NOT_STARTED,
+    tasks: [
+      { title: "Replace V1_DOMAIN hardcode with a real site-selection mechanism across every page/data function", status: TODO },
+      { title: "Site switcher in the sidebar (or per-site subdomain/route)", status: TODO },
+      { title: "Onboard esco-pacific.com as a second real Site row and run its first crawl", status: TODO },
+      { title: "Verify every page degrades gracefully for a site with little/no crawl history yet", status: TODO },
+    ],
+  },
+  {
+    key: "U",
+    name: "UI/UX Design Polish",
+    summary: "A real design pass so the app feels like a modern SaaS product, not a functional internal tool.",
+    status: ProjectPhaseStatus.NOT_STARTED,
+    tasks: [
+      { title: "Design direction / visual system pass (beyond the current functional card/table styling)", status: TODO },
+      { title: "Navigation and information architecture review now that multi-site exists", status: TODO },
+      { title: "Responsive/mobile pass", status: TODO },
+    ],
+  },
+  {
+    key: "V",
+    name: "Change Pacing / Drip-Feed Intelligence",
+    summary: "Research-backed guidance on WHEN to make changes (rollout pacing, backlink outreach velocity), not just what to fix.",
+    status: ProjectPhaseStatus.NOT_STARTED,
+    tasks: [
+      { title: "Research real guidance on SEO change velocity and backlink outreach pacing before designing anything", status: TODO },
+      { title: "Design a pacing/scheduling layer on top of the existing 30/60/90-day roadmap", status: TODO },
+      { title: "Surface suggested rollout dates/spacing in the Action Plan", status: TODO },
+    ],
+  },
+  {
+    key: "W",
+    name: "AI Chat Assistant",
+    summary: "A SearchAtlas-style chat over the site's real findings/action-plan data (\"What are today's tasks?\").",
+    status: ProjectPhaseStatus.NOT_STARTED,
+    tasks: [
+      { title: "Design the chat's data access (read-only over Finding/ActionPlan/Scorecard, scoped to the selected site)", status: TODO },
+      { title: "Build the chat UI + Anthropic-backed query handling", status: TODO },
+      { title: "Verify answers stay grounded in real data (no fabricated numbers, same discipline as the Scorecard/Citation fixes)", status: TODO },
+    ],
+  },
+  {
     key: "AUDIT",
     name: "Accuracy Audit",
     summary: "Ongoing: sample real findings from every check category and verify each against live data.",
