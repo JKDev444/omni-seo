@@ -12,6 +12,7 @@ import { V1_DOMAIN } from "@/lib/data/dashboard";
 import { getActiveMaintenanceWeek } from "@/lib/maintenance/seedMonth";
 import { getContentStackCompleteness } from "@/lib/data/contentStacks";
 import { getOpenFindingsForSite, type FindingWithPage } from "@/lib/findings/getOpenFindings";
+import { computeRoadmapPlan, type RoadmapPlan } from "@/lib/data/roadmapPlan";
 
 export type { FindingWithPage };
 
@@ -52,6 +53,7 @@ export interface ActionPlanData {
     maintenanceMonth: string;
   };
   counts: { critical: number; high: number; medium: number; low: number };
+  roadmap: RoadmapPlan;
 }
 
 export async function getActionPlanData(): Promise<ActionPlanData> {
@@ -64,6 +66,7 @@ export async function getActionPlanData(): Promise<ActionPlanData> {
       thisMonth: { findings: [], findingsTotal: 0, ctrRewrites: [], contentStackGaps: [], backlinkOutreach: [] },
       ongoing: { findings: [], maintenanceTasks: [], maintenanceMonth: "" },
       counts: { critical: 0, high: 0, medium: 0, low: 0 },
+      roadmap: computeRoadmapPlan([]),
     };
   }
 
@@ -129,5 +132,6 @@ export async function getActionPlanData(): Promise<ActionPlanData> {
       medium: byPriority.MEDIUM.length,
       low: byPriority.LOW.length,
     },
+    roadmap: computeRoadmapPlan(openFindings),
   };
 }

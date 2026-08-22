@@ -1,5 +1,6 @@
 import { getActionPlanData, type FindingWithPage } from "@/lib/data/actionPlan";
 import { updateFindingStatus } from "@/lib/actions/findingActions";
+import { FIX_LOCATION_GUIDE, type RoadmapBucket } from "@/lib/data/roadmapPlan";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ function FindingCard({ f }: { f: FindingWithPage }) {
   const markDone = updateFindingStatus.bind(null, f.id, "COMPLETED");
   const ignore = updateFindingStatus.bind(null, f.id, "IGNORED");
   const falsePositive = updateFindingStatus.bind(null, f.id, "FALSE_POSITIVE");
+  const guide = f.fixLocation ? FIX_LOCATION_GUIDE[f.fixLocation] : undefined;
 
   return (
     <div style={{ padding: "var(--space-3) 0", borderBottom: "1px solid var(--color-border)" }}>
@@ -33,6 +35,17 @@ function FindingCard({ f }: { f: FindingWithPage }) {
         <p style={{ fontSize: "var(--text-sm)" }}>
           <strong>Fix:</strong> {f.fixType} {f.fixLocation && <span style={{ color: "var(--color-ink-muted)" }}>({f.fixLocation})</span>}
         </p>
+      )}
+      {guide && (
+        <details style={{ fontSize: "var(--text-sm)", margin: "var(--space-1) 0" }}>
+          <summary style={{ cursor: "pointer", color: "var(--color-ink-muted)" }}>Exactly where to fix this</summary>
+          <p style={{ margin: "var(--space-1) 0 2px", color: "var(--color-ink-muted)" }}>{guide.where}</p>
+          <ol style={{ paddingLeft: "var(--space-5)", color: "var(--color-ink-muted)", margin: 0 }}>
+            {guide.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </details>
       )}
       {f.page && <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)" }}>{pathFromUrl(f.page.url)}</p>}
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
@@ -52,6 +65,34 @@ function FindingCard({ f }: { f: FindingWithPage }) {
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+function CHECKSTEP_LABEL(checkStep: string): string {
+  return checkStep.replace(/^Step \d+ - /, "").replace(/^Technical SEO Engine - /, "");
+}
+
+function RoadmapCard({ bucket }: { bucket: RoadmapBucket }) {
+  return (
+    <div className="card">
+      <h3 style={{ fontSize: "var(--text-sm)", fontWeight: 600, margin: "0 0 var(--space-1)" }}>{bucket.label}</h3>
+      <div className="score data-value" style={{ fontSize: "var(--text-2xl)" }}>
+        {bucket.count}
+      </div>
+      <p style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-muted)", margin: "2px 0 var(--space-2)" }}>
+        {bucket.quickWinCount > 0 ? `${bucket.quickWinCount} are quick, mechanical fixes` : "mostly content/authority work"}
+      </p>
+      {bucket.topCategories.length > 0 && (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-faint)" }}>
+          {bucket.topCategories.map((c) => (
+            <li key={c.checkStep} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+              <span>{CHECKSTEP_LABEL(c.checkStep)}</span>
+              <span style={{ fontFamily: "var(--font-mono)" }}>{c.count}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -125,6 +166,17 @@ export default async function ActionPlanPage() {
         <div className="card">
           <div className="ring-count">Low</div>
           <div className="score data-value" style={{ fontSize: "var(--text-2xl)" }}>{data.counts.low}</div>
+        </div>
+      </div>
+
+      <div className="section">
+        <h2 className="card-title" style={{ marginBottom: "var(--space-2)" }}>
+          Your 30/60/90-day plan
+        </h2>
+        <div className="rings-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+          <RoadmapCard bucket={data.roadmap.day30} />
+          <RoadmapCard bucket={data.roadmap.day60} />
+          <RoadmapCard bucket={data.roadmap.day90} />
         </div>
       </div>
 
