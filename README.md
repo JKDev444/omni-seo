@@ -40,10 +40,10 @@ exists for going deep on one specific thing.
 | J | Content Stacks / topical authority (`/content-stacks`) | Live, real data |
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
-| M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates), and schema URL consistency (a page-describing entity's `url`/`mainEntityOfPage` should match that page's real URL — catches stale schema left behind after a URL restructure) are live, part of every crawl. Not built: schema-vs-visible-content mismatch and full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
+| M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates), schema URL consistency (a page-describing entity's `url`/`mainEntityOfPage` should match that page's real URL — catches stale schema left behind after a URL restructure), and schema-vs-visible-content mismatch (FAQPage answers and Service names should actually appear in the page's visible copy, not just the JSON-LD) are live, part of every crawl. Not built: full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
 | P | Guided Roadmap (`/action-plan`) | **Complete** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page, with in-app buttons to mark a finding done/ignored/false-positive (a server action, `lib/actions/findingActions.ts`). Status carries forward across crawls (`lib/findings/createFinding.ts` checks the prior crawl for a matching finding and carries IGNORED/FALSE_POSITIVE/ACCEPTED onto the new one — COMPLETED deliberately does not carry forward, so a still-broken issue resurfaces as a real regression instead of staying hidden). A 30/60/90-day roadmap section (`lib/data/roadmapPlan.ts`) buckets open findings by priority + estimated effort, not priority alone, so quick mechanical fixes don't wait behind slow content work. Every finding card also has an "Exactly where to fix this" expandable with the real Shopify Admin navigation path and steps, keyed off `Finding.fixLocation`'s actual vocabulary (confirmed against live data: Theme Liquid and Content rewrite account for nearly all of it) |
 
-| R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below) and regression detection are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. Not built: SEO change tracking (a full changelog of every field change, not just regressions), deployment verification gate |
+| R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below), regression detection, and full SEO change tracking are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. `lib/checks/changeTracking.ts` complements that with the complete audit trail underneath it — every title/meta/canonical/H1/status/schema-type-set change, not just the ones that got worse — viewable at `/change-log`. Not built: deployment verification gate (no staging environment exists yet for this app to diff against) |
 
 | N | AI Search Readiness (`/ai-search`) | **Live, real data** — entity clarity, citation readiness, extractability, and direct-answer-block detection per page, LLM-assisted (same pattern as Phase H, with every lesson from it applied from the start — compact JSON, brace-repair, timeout, real max_tokens headroom). Not a claim of measuring actual AI-citation rankings (needs a paid tracking service like Otterly.ai/Peec AI) — scores the on-page signals that make citation more likely. Runs monthly via GitHub Actions alongside the other LLM checks |
 
@@ -95,8 +95,10 @@ citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 `/performance` (CWV) · `/internal-links` · `/content` (LLM content
 review) · `/ai-search` (AI Search Readiness) · `/keywords` (rank tracking + cannibalization + decay + CTR
 rewrites) · `/content-stacks` · `/backlinks` · `/reports` (monthly
-client report) · `/project-tracker` (phase/task board for following this
-app's own build progress — see Project Tracker section below) · `/login`
+client report) · `/change-log` (every title/meta/canonical/H1/status/
+schema change, crawl over crawl) · `/project-tracker` (phase/task board
+for following this app's own build progress — see Project Tracker
+section below) · `/login`
 
 The Backlinks, Keywords, and Indexation pages' biggest tables (150, 117,
 182+ rows) use `components/FilterableTable.tsx` — a client-side search
@@ -232,9 +234,21 @@ Two real bugs found and fixed as a result:
   reconciliation mechanism above — the fix-verify-fix loop working as
   designed, including on new code from the same session.
 
+- Building the schema-vs-content mismatch check and the SEO change log
+  (Phase M/R) got the same treatment before committing: the content-
+  match check was verified against live pages with curl plus the exact
+  `extractVisibleText` logic it uses internally, confirming two sample
+  findings (a Service name, an FAQ answer) were genuinely absent from
+  the page's visible text, not false positives — 76 findings across 182
+  pages, not a flood. The change log's first real crawl logged 0
+  changes, which is ambiguous from the outside (nothing changed, or the
+  diffing logic is broken) — resolved with a synthetic test: two fake
+  snapshots with known field differences, confirmed `logSeoChanges`
+  logged exactly the 4 expected changes and correctly ignored the 2
+  deliberately-unchanged fields, then deleted the test data.
+
 This is an ongoing exercise, not a one-time pass — the next round should
-sample Keywords findings and Phase M's remaining schema-vs-content
-mismatch check the same way.
+sample Keywords findings the same way.
 
 ## Architecture notes worth knowing before changing things
 - `auth.config.ts` is deliberately Prisma-free — shared with
