@@ -26,8 +26,9 @@ import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
 import { createFindingRecord } from "../findings/createFinding";
 import { extractInternalLinks } from "./extractLinks";
 import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
-import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, runSchemaUrlConsistencyCheck, type SchemaGap } from "../checks/schemaValidation";
+import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, runSchemaUrlConsistencyCheck, runSchemaContentMatchCheck, type SchemaGap } from "../checks/schemaValidation";
 import { detectRegressions } from "../checks/regressionDetection";
+import { logSeoChanges } from "../checks/changeTracking";
 import { ReconciliationTracker } from "../findings/autoResolveFixedFindings";
 
 const prisma = new PrismaClient();
@@ -381,6 +382,8 @@ export async function crawlSite(siteId: string, domain: string) {
         tracker.markEvaluated(page.id, "Technical SEO Engine - Content Depth");
         findings.push(...runSchemaRequiredPropertiesCheck(html));
         tracker.markEvaluated(page.id, "Schema Validation - Required Properties");
+        findings.push(...runSchemaContentMatchCheck(html));
+        tracker.markEvaluated(page.id, "Schema Validation - Content Match");
         const localBusinessId = extractLocalBusinessId(html);
         pagesWithLocalBusinessIds.push({ url, id: localBusinessId, hasLocalBusinessSchema: localBusinessId !== null });
         pagesWithSchemaGaps.push({ url, gaps: detectSchemaGaps(html) });
@@ -497,6 +500,12 @@ export async function crawlSite(siteId: string, domain: string) {
       totalFindings++;
     }
 
+    // Full change log -- every title/meta/canonical/H1/status/schema-set
+    // change since the last crawl, not just the regressions flagged
+    // above. Uses the same snapshot pair, so it's cheap to run right
+    // alongside regression detection.
+    const changesLogged = await logSeoChanges(siteId, crawl.id);
+
     // Complement to the crawl's own detection: any PENDING finding for a
     // (page, checkStep) pair that was genuinely re-evaluated this crawl,
     // and did NOT get recreated, means the underlying issue is actually
@@ -511,7 +520,7 @@ export async function crawlSite(siteId: string, domain: string) {
       data: { status: "completed", finishedAt: new Date(), pagesFound: pageResults.length },
     });
 
-    return { crawlId: crawl.id, pagesFound: pageResults.length, findingsCount: totalFindings };
+    return { crawlId: crawl.id, pagesFound: pageResults.length, findingsCount: totalFindings, changesLogged };
   } catch (err) {
     await prisma.crawl.update({
       where: { id: crawl.id },

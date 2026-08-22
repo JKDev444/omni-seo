@@ -12,14 +12,21 @@
  * the crawl already has -- every page's pre- and post-redirect URL from
  * fetchWithRedirects.ts -- rather than a new per-page network call.
  *
- * Not built: schema-vs-visible-content mismatch (needs a content-
- * understanding pass, not just parsing) and full Rich-Results-Test
- * eligibility (a genuinely separate concern from Schema.org validity —
- * would need Google's Rich Results Test API, a new integration, not yet
- * justified).
+ * Also includes a scoped schema-vs-visible-content check: FAQPage answer
+ * text and Service names should actually appear in the page's visible
+ * copy, not just the JSON-LD (Google explicitly requires FAQ content to
+ * be visible to users). Scoped to just these two types -- confirmed
+ * against live crawl data which schema types this site actually uses
+ * (no AggregateRating/Review anywhere, so that branch would be dead
+ * code) rather than building for every type Schema.org defines.
+ *
+ * Not built: full Rich-Results-Test eligibility (a genuinely separate
+ * concern from Schema.org validity — would need Google's Rich Results
+ * Test API, a new integration, not yet justified).
  */
 import * as cheerio from "cheerio";
 import type { RawFinding } from "./onPageChecks";
+import { extractVisibleText } from "./contentDepthChecks";
 
 // Required properties per Schema.org type for the rich-result / entity-
 // clarity purposes that actually matter here — not the full Schema.org
@@ -279,4 +286,105 @@ export function runLocalBusinessIdConsistencyCheck(pages: PageLocalBusinessId[])
   }
 
   return results;
+}
+
+function stripHtmlAndEntities(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&amp;|&#\d+;|&[a-z]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+interface FaqQuestion {
+  name: string;
+  answerText: string;
+}
+
+function extractFaqQuestions(data: Record<string, unknown>): FaqQuestion[] {
+  const mainEntity = data.mainEntity;
+  const entities = Array.isArray(mainEntity) ? mainEntity : mainEntity ? [mainEntity] : [];
+  const questions: FaqQuestion[] = [];
+
+  for (const e of entities) {
+    if (!e || typeof e !== "object") continue;
+    const q = e as Record<string, unknown>;
+    const name = typeof q.name === "string" ? q.name : null;
+    const answer = q.acceptedAnswer as Record<string, unknown> | undefined;
+    const answerText = answer && typeof answer.text === "string" ? answer.text : null;
+    if (name && answerText) questions.push({ name, answerText });
+  }
+
+  return questions;
+}
+
+// A fingerprint shorter than this is too generic to reliably confirm
+// absence -- common short answers ("Yes.", "It depends.") would produce
+// false positives by coincidence, not by genuinely being missing.
+const MIN_FINGERPRINT_LENGTH = 15;
+const FINGERPRINT_LENGTH = 40;
+
+/**
+ * Per-page: FAQPage answers and Service names should actually be visible
+ * on the page, not just declared in JSON-LD -- Google's own structured
+ * data guidelines explicitly prohibit marking up content that isn't
+ * visible to users. Uses raw-HTML text extraction (not rendered DOM), so
+ * content hidden behind an accordion's CSS/JS collapse state still
+ * counts as present -- only content genuinely absent from the markup is
+ * flagged.
+ */
+export function runSchemaContentMatchCheck(rawHtml: string): RawFinding[] {
+  const findings: RawFinding[] = [];
+  const visibleText = normalizeForMatch(extractVisibleText(rawHtml));
+  const blocks = parseSchemaBlocks(rawHtml);
+
+  for (const block of blocks) {
+    if (block.types.includes("FAQPage")) {
+      const questions = extractFaqQuestions(block.data);
+      const missingAnswers = questions.filter((q) => {
+        const fingerprint = normalizeForMatch(stripHtmlAndEntities(q.answerText)).slice(0, FINGERPRINT_LENGTH);
+        return fingerprint.length >= MIN_FINGERPRINT_LENGTH && !visibleText.includes(fingerprint);
+      });
+
+      if (missingAnswers.length > 0) {
+        findings.push({
+          category: "schema",
+          checkStep: "Schema Validation - Content Match",
+          title: `FAQPage schema has ${missingAnswers.length} answer${missingAnswers.length > 1 ? "s" : ""} not visible on the page`,
+          description: `Google requires FAQ structured data to match content actually visible to users. Not found in the page's visible text: ${missingAnswers.map((q) => `"${q.name}"`).join(", ")}.`,
+          fixType: "Make sure every FAQ question and its full answer text is visible on the page (not just in the JSON-LD), or remove the FAQPage schema for any that aren't.",
+          priority: "MEDIUM",
+          fixLocation: "Theme Liquid",
+        });
+      }
+    }
+
+    if (block.types.includes("Service")) {
+      const name = typeof block.data.name === "string" ? block.data.name : null;
+      if (name) {
+        const normalizedName = normalizeForMatch(name);
+        if (normalizedName.length > 3 && !visibleText.includes(normalizedName)) {
+          findings.push({
+            category: "schema",
+            checkStep: "Schema Validation - Content Match",
+            title: `Service schema name doesn't appear in this page's visible content`,
+            description: `The Service schema declares the name "${name}", but that text doesn't appear anywhere in the page's visible copy. Schema should describe what's actually on the page.`,
+            fixType: `Either mention "${name}" in the page's visible content, or correct the Service schema's name to match what the page actually describes.`,
+            priority: "LOW",
+            fixLocation: "Theme Liquid",
+          });
+        }
+      }
+    }
+  }
+
+  return findings;
 }

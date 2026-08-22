@@ -28,6 +28,7 @@ const CHECKSTEP_EFFORT: Record<string, EffortTier> = {
   "Schema Validation - Systemic Gap": "medium",
   "Schema Validation - Entity Consistency": "quick",
   "Schema Validation - URL Consistency": "quick",
+  "Schema Validation - Content Match": "quick",
   "Step 4 - Schema by page type": "medium",
   "Internal Link Graph": "quick",
   "Content Depth - LLM Review": "long",

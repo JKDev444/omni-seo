@@ -97,6 +97,7 @@ model Site {
   backlinkProfiles BacklinkProfile[]
   backlinkGapDomains BacklinkGapDomain[]
   aiSearchReadiness AiSearchReadiness[]
+  seoChangeLogs SeoChangeLog[]
 
   gscSiteUrl     String? // e.g. "https://omnicenters.com/" or "sc-domain:omnicenters.com"
   ga4PropertyId  String? // GA4 property ID, e.g. "properties/123456789"
@@ -114,6 +115,7 @@ model Crawl {
   findings    Finding[]
   snapshots   PageSnapshot[]
   internalLinks InternalLink[]
+  seoChangeLogs SeoChangeLog[]
 }
 
 // One row per crawled URL
@@ -136,6 +138,7 @@ model Page {
   ctrRewriteSuggestions CtrRewriteSuggestion[]
   contentStackMemberships ContentStackMember[]
   aiSearchReadiness AiSearchReadiness[]
+  seoChangeLogs SeoChangeLog[]
 
   @@unique([siteId, url])
 }
@@ -643,4 +646,27 @@ model ProjectTask {
   completedAt DateTime?
 
   @@unique([phaseId, title])
+}
+
+// Phase R: a full changelog of every meaningful on-page field change,
+// crawl over crawl -- not just regressions (regressionDetection.ts
+// already flags those, prioritized and consolidated). This is the
+// complete "what changed and when" record underneath it: every title,
+// meta description, canonical, H1, status code, or schema-type-set
+// change, whether it made things better, worse, or just different.
+model SeoChangeLog {
+  id         String   @id @default(cuid())
+  siteId     String
+  site       Site     @relation(fields: [siteId], references: [id])
+  pageId     String?
+  page       Page?    @relation(fields: [pageId], references: [id])
+  crawlId    String
+  crawl      Crawl    @relation(fields: [crawlId], references: [id])
+  field      String   // "title" | "metaDesc" | "canonical" | "h1" | "statusCode" | "schemaTypes"
+  oldValue   String?
+  newValue   String?
+  detectedAt DateTime @default(now())
+
+  @@index([siteId, detectedAt])
+  @@index([pageId])
 }
