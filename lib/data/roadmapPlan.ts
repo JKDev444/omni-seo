@@ -35,6 +35,7 @@ const CHECKSTEP_EFFORT: Record<string, EffortTier> = {
   "AI Search Readiness": "long",
   "Core Web Vitals - Field Data": "long",
   "Regression Detection": "medium",
+  "Rich Results Eligibility": "medium",
   "Rendered DOM Comparison": "medium",
 };
 

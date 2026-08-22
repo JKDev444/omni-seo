@@ -7,6 +7,15 @@
 import { google } from "googleapis";
 import { getGoogleServiceAccountAuth } from "./googleServiceAccount";
 import { prisma } from "@/lib/db";
+import { createFindingRecord } from "@/lib/findings/createFinding";
+import { ReconciliationTracker } from "@/lib/findings/autoResolveFixedFindings";
+
+export interface RichResultsIssue {
+  richResultType: string;
+  itemName: string | null;
+  severity: string | null;
+  issueMessage: string | null;
+}
 
 export type InspectionResult =
   | {
@@ -19,6 +28,8 @@ export type InspectionResult =
       googleCanonical: string | null;
       userCanonical: string | null;
       lastCrawlTime: string | null;
+      richResultsVerdict: string | null;
+      richResultsIssues: RichResultsIssue[];
     }
   | { ok: false; reason: "missing_credentials" | "invalid_credentials" | "missing_site_url" | "api_error"; message: string };
 
@@ -86,6 +97,26 @@ export async function inspectUrl(siteId: string, url: string): Promise<Inspectio
     const userCanonical = result?.userCanonical ?? null;
     const lastCrawlTime = result?.lastCrawlTime ?? null;
 
+    // Same API call, same quota -- Google's own Rich Results eligibility
+    // verdict is right alongside indexStatusResult in the same response,
+    // so this needed no separate integration (contrary to the original
+    // scoping note that assumed it would).
+    const richResults = res.data.inspectionResult?.richResultsResult;
+    const richResultsVerdict = richResults?.verdict ?? null;
+    const richResultsIssues: RichResultsIssue[] = (richResults?.detectedItems ?? []).flatMap((group) =>
+      (group.items ?? []).flatMap((item) =>
+        (item.issues ?? []).map((issue) => ({
+          // Google's API sometimes returns an empty string (not null) for
+          // richResultType on certain issue categories -- confirmed live,
+          // not a parsing bug -- so `?? "fallback"` alone doesn't catch it.
+          richResultType: group.richResultType || "Structured data",
+          itemName: item.name ?? null,
+          severity: issue.severity ?? null,
+          issueMessage: issue.issueMessage ?? null,
+        }))
+      )
+    );
+
     return {
       ok: true,
       normalizedStatus: normalizeStatus({ indexingState, verdict, coverageState, googleCanonical, userCanonical }),
@@ -96,6 +127,8 @@ export async function inspectUrl(siteId: string, url: string): Promise<Inspectio
       googleCanonical,
       userCanonical,
       lastCrawlTime,
+      richResultsVerdict,
+      richResultsIssues,
     };
   } catch (err) {
     return { ok: false, reason: "api_error", message: err instanceof Error ? err.message : String(err) };
@@ -105,17 +138,20 @@ export async function inspectUrl(siteId: string, url: string): Promise<Inspectio
 /** Inspects every currently-known page for a site, respecting the API's per-minute quota. */
 export async function inspectAllPages(
   siteId: string
-): Promise<{ ok: boolean; inspected: number; errors: number; errorDetails: { url: string; message: string }[]; message?: string }> {
-  const pages = await prisma.page.findMany({ where: { siteId }, select: { url: true } });
+): Promise<{ ok: boolean; inspected: number; errors: number; errorDetails: { url: string; message: string }[]; findingsCreated: number; message?: string }> {
+  const pages = await prisma.page.findMany({ where: { siteId }, select: { id: true, url: true } });
+  const latestCrawl = await prisma.crawl.findFirst({ where: { siteId, status: "completed" }, orderBy: { startedAt: "desc" } });
   let inspected = 0;
   let errors = 0;
+  let findingsCreated = 0;
   const errorDetails: { url: string; message: string }[] = [];
+  const tracker = new ReconciliationTracker();
 
-  for (const { url } of pages) {
+  for (const { id: pageId, url } of pages) {
     const result = await inspectUrl(siteId, url);
     if (!result.ok) {
       if (result.reason === "missing_credentials" || result.reason === "missing_site_url") {
-        return { ok: false, inspected, errors, errorDetails, message: result.message };
+        return { ok: false, inspected, errors, errorDetails, findingsCreated, message: result.message };
       }
       errors++;
       errorDetails.push({ url, message: result.message });
@@ -133,6 +169,8 @@ export async function inspectAllPages(
         googleCanonical: result.googleCanonical,
         userCanonical: result.userCanonical,
         lastCrawlTime: result.lastCrawlTime ? new Date(result.lastCrawlTime) : null,
+        richResultsVerdict: result.richResultsVerdict,
+        richResultsIssues: JSON.parse(JSON.stringify(result.richResultsIssues)),
         fetchedAt: new Date(),
       },
       create: {
@@ -146,13 +184,49 @@ export async function inspectAllPages(
         googleCanonical: result.googleCanonical,
         userCanonical: result.userCanonical,
         lastCrawlTime: result.lastCrawlTime ? new Date(result.lastCrawlTime) : null,
+        richResultsVerdict: result.richResultsVerdict,
+        richResultsIssues: JSON.parse(JSON.stringify(result.richResultsIssues)),
       },
     });
     inspected++;
+
+    // Only ERROR severity actually blocks the rich result (per Google's
+    // own field doc: "Items with an issue of status ERROR cannot appear
+    // with rich result features in Google Search results") -- WARNING
+    // issues don't block eligibility, so they're not worth a Finding.
+    if (latestCrawl) {
+      const errorIssues = result.richResultsIssues.filter((i) => i.severity === "ERROR");
+      tracker.markEvaluated(pageId, "Rich Results Eligibility");
+
+      const byType = new Map<string, RichResultsIssue[]>();
+      for (const issue of errorIssues) {
+        const list = byType.get(issue.richResultType) ?? [];
+        list.push(issue);
+        byType.set(issue.richResultType, list);
+      }
+
+      for (const [richResultType, issues] of byType) {
+        const messages = [...new Set(issues.map((i) => i.issueMessage).filter((m): m is string => m !== null))];
+        const finding = {
+          category: "schema" as const,
+          checkStep: "Rich Results Eligibility",
+          title: `${richResultType} rich result ineligible: ${messages[0] ?? "structured data error"}`,
+          description: `Google's own Rich Results test found ${issues.length} error${issues.length > 1 ? "s" : ""} preventing this page's ${richResultType} structured data from showing as a rich result: ${messages.join("; ")}.`,
+          fixType: `Fix the ${richResultType} structured data per Google's Rich Results Test (search.google.com/test/rich-results) for this URL.`,
+          priority: "MEDIUM" as const,
+          fixLocation: "Theme Liquid" as const,
+        };
+        await createFindingRecord(latestCrawl.id, pageId, finding);
+        tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
+        findingsCreated++;
+      }
+    }
 
     // Stay well under the 600/minute quota — 10/sec is already generous for a single site.
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  return { ok: true, inspected, errors, errorDetails };
+  if (latestCrawl) await tracker.resolveFixedFindings(siteId);
+
+  return { ok: true, inspected, errors, errorDetails, findingsCreated };
 }

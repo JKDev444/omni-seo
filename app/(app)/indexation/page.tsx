@@ -133,6 +133,39 @@ export default async function IndexationPage() {
         </div>
       )}
 
+      {data.richResultsFailures.length > 0 && (
+        <div className="section card">
+          <h2 className="card-title">Rich Results eligibility — Google's own Rich Results Test verdict</h2>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-3)" }}>
+            {data.richResultsFailures.length} page{data.richResultsFailures.length > 1 ? "s have" : " has"} at least
+            one structured data error that blocks a rich result from appearing in Search — same data as the Action
+            Plan's &quot;Rich Results Eligibility&quot; findings, shown here with full detail per issue.
+          </p>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Page</th>
+                <th>Rich result type</th>
+                <th>Issue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.richResultsFailures.flatMap((r) =>
+                r.richResultsIssues
+                  .filter((i) => i.severity === "ERROR")
+                  .map((issue, idx) => (
+                    <tr key={`${r.url}-${idx}`}>
+                      <td>{pathFromUrl(r.url)}</td>
+                      <td>{issue.richResultType}</td>
+                      <td style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)" }}>{issue.issueMessage ?? "—"}</td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="section card">
         <h2 className="card-title">All inspected pages</h2>
         <FilterableTable

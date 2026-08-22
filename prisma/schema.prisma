@@ -357,6 +357,8 @@ model UrlInspection {
   googleCanonical   String?
   userCanonical     String?
   lastCrawlTime     DateTime?
+  richResultsVerdict String?  // PASS | FAIL | NEUTRAL -- Google's own rich-result eligibility verdict, same API call as indexation, no separate integration needed
+  richResultsIssues Json?     // [{ richResultType, itemName, severity, issueMessage }] -- ERROR-severity issues block that rich result type in Search
   fetchedAt         DateTime  @default(now())
 
   @@unique([siteId, url])

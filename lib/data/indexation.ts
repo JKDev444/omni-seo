@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/db";
 import { V1_DOMAIN } from "@/lib/data/dashboard";
 
+export interface RichResultsIssueRow {
+  richResultType: string;
+  itemName: string | null;
+  severity: string | null;
+  issueMessage: string | null;
+}
+
 export interface IndexationRow {
   url: string;
   googleStatus: string;
@@ -14,6 +21,8 @@ export interface IndexationRow {
   indexingState: string | null;
   googleCanonical: string | null;
   userCanonical: string | null;
+  richResultsVerdict: string | null;
+  richResultsIssues: RichResultsIssueRow[];
 }
 
 export interface IndexationData {
@@ -23,11 +32,12 @@ export interface IndexationData {
   counts: Record<string, number>;
   mismatches: IndexationRow[];
   rows: IndexationRow[];
+  richResultsFailures: IndexationRow[];
 }
 
 export async function getIndexationData(): Promise<IndexationData> {
   const site = await prisma.site.findUnique({ where: { domain: V1_DOMAIN } });
-  if (!site) return { site: null, connected: false, lastRunAt: null, counts: {}, mismatches: [], rows: [] };
+  if (!site) return { site: null, connected: false, lastRunAt: null, counts: {}, mismatches: [], rows: [], richResultsFailures: [] };
 
   const inspections = await prisma.urlInspection.findMany({ where: { siteId: site.id }, orderBy: { url: "asc" } });
   if (inspections.length === 0) {
@@ -38,6 +48,7 @@ export async function getIndexationData(): Promise<IndexationData> {
       counts: {},
       mismatches: [],
       rows: [],
+      richResultsFailures: [],
     };
   }
 
@@ -73,6 +84,8 @@ export async function getIndexationData(): Promise<IndexationData> {
       indexingState: insp.indexingState,
       googleCanonical: insp.googleCanonical,
       userCanonical: insp.userCanonical,
+      richResultsVerdict: insp.richResultsVerdict,
+      richResultsIssues: (insp.richResultsIssues as unknown as RichResultsIssueRow[] | null) ?? [],
     });
   }
 
@@ -83,5 +96,6 @@ export async function getIndexationData(): Promise<IndexationData> {
     counts,
     mismatches: rows.filter((r) => r.mismatch),
     rows,
+    richResultsFailures: rows.filter((r) => r.richResultsIssues.some((i) => i.severity === "ERROR")),
   };
 }
