@@ -26,7 +26,7 @@ import { fetchWithRedirects, type FetchResult } from "./fetchWithRedirects";
 import { createFindingRecord } from "../findings/createFinding";
 import { extractInternalLinks } from "./extractLinks";
 import { analyzeLinkGraph, runInternalLinkFindings } from "../checks/internalLinkGraph";
-import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, type SchemaGap } from "../checks/schemaValidation";
+import { runSchemaRequiredPropertiesCheck, extractLocalBusinessId, runLocalBusinessIdConsistencyCheck, detectSchemaGaps, runSystemicSchemaGapCheck, runSchemaUrlConsistencyCheck, type SchemaGap } from "../checks/schemaValidation";
 import { detectRegressions } from "../checks/regressionDetection";
 import { ReconciliationTracker } from "../findings/autoResolveFixedFindings";
 
@@ -283,6 +283,7 @@ export async function crawlSite(siteId: string, domain: string) {
     const pagesWithCanonicals: { url: string; canonical: string }[] = [];
     const pagesWithLocalBusinessIds: { url: string; id: string | null; hasLocalBusinessSchema: boolean }[] = [];
     const pagesWithSchemaGaps: { url: string; gaps: SchemaGap[] }[] = [];
+    const pagesForSchemaUrlCheck: { url: string; finalUrl: string; rawHtml: string }[] = [];
 
     for (const { url, html, renderedHtml, status, pageType, fetchResult } of pageResults) {
       const $ = cheerio.load(html);
@@ -383,6 +384,7 @@ export async function crawlSite(siteId: string, domain: string) {
         const localBusinessId = extractLocalBusinessId(html);
         pagesWithLocalBusinessIds.push({ url, id: localBusinessId, hasLocalBusinessSchema: localBusinessId !== null });
         pagesWithSchemaGaps.push({ url, gaps: detectSchemaGaps(html) });
+        pagesForSchemaUrlCheck.push({ url, finalUrl: fetchResult.finalUrl, rawHtml: html });
       }
       if (renderedHtml) {
         findings.push(...runRenderComparisonChecks(html, renderedHtml));
@@ -415,6 +417,19 @@ export async function crawlSite(siteId: string, domain: string) {
       tracker.markEvaluated(urlToPageId.get(pUrl) ?? null, "Schema Validation - Entity Consistency");
     }
     for (const { url, finding } of runLocalBusinessIdConsistencyCheck(pagesWithLocalBusinessIds)) {
+      const pageId = urlToPageId.get(url) ?? null;
+      await createFindingRecord(crawl.id, pageId, finding);
+      tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });
+      totalFindings++;
+    }
+
+    // Sitewide schema URL consistency — a page's own url/mainEntityOfPage
+    // schema property should point back at that same page's real,
+    // current URL, not a stale pre-redirect one.
+    for (const { url: pUrl } of pagesForSchemaUrlCheck) {
+      tracker.markEvaluated(urlToPageId.get(pUrl) ?? null, "Schema Validation - URL Consistency");
+    }
+    for (const { url, finding } of runSchemaUrlConsistencyCheck(pagesForSchemaUrlCheck)) {
       const pageId = urlToPageId.get(url) ?? null;
       await createFindingRecord(crawl.id, pageId, finding);
       tracker.markCreated({ pageId, category: finding.category, checkStep: finding.checkStep, title: finding.title });

@@ -70,5 +70,35 @@ export async function runLocalSeoChecks(siteId: string, homepageHtml: string): P
     { label: "GBP public listing", nap: gbpNap },
   ];
 
-  return runNapConsistencyCheck(sources);
+  const findings = runNapConsistencyCheck(sources);
+  await syncGbpCitationStatus(siteId, gbpProfile !== null, findings);
+  return findings;
+}
+
+/**
+ * Keeps the Dashboard's Citation Tracker "Google Business Profile" row
+ * real instead of the fabricated placeholder it shipped with (found live
+ * during an accuracy audit -- it showed a hardcoded "NAP inconsistent"
+ * red dot with a note admitting "Sample data — not a live check", which
+ * looks identical to a genuine finding). Derives napConsistent/indexed
+ * from the NAP check that already runs every crawl, the same way the
+ * Scorecard's real metrics replaced its own seeded placeholders.
+ * No-op if the row was never seeded (nothing to update).
+ */
+async function syncGbpCitationStatus(siteId: string, hasGbpProfile: boolean, findings: RawFinding[]): Promise<void> {
+  const citation = await prisma.citation.findFirst({ where: { siteId, directory: "Google Business Profile" } });
+  if (!citation) return;
+
+  const sourceUnavailable = findings.some((f) => f.title === "NAP source unavailable: GBP public listing");
+  const mismatchFound = findings.some((f) => f.title.endsWith("vs. GBP public listing") && (f.title.startsWith("Phone mismatch") || f.title.startsWith("Address mismatch")));
+
+  await prisma.citation.update({
+    where: { id: citation.id },
+    data: {
+      napConsistent: sourceUnavailable ? null : !mismatchFound,
+      indexed: hasGbpProfile ? true : null,
+      lastCheckedAt: new Date(),
+      notes: hasGbpProfile ? null : "No cached GBP profile yet — run the Places API pull (scripts/runGbpProfilePull.ts) to enable a real check.",
+    },
+  });
 }
