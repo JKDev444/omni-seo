@@ -15,7 +15,7 @@ context: this is the whole picture as of the last commit.
 Next.js 15 (App Router) → GitHub (JKDev444/omni-seo) → Vercel (hosting +
 Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login)
 
-## Status: Phases A–L, N, P, Q complete; F caveated, M/R partial; K skipped by choice, O out of scope (no products)
+## Status: Phases A–N, P, Q complete; F caveated, R partial; K skipped by choice, O out of scope (no products)
 
 **The core intent of this app**: not just a pile of diagnostic reports —
 a tool that tells the user everything they need to do, on whatever
@@ -40,7 +40,7 @@ exists for going deep on one specific thing.
 | J | Content Stacks / topical authority (`/content-stacks`) | Live, real data |
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
-| M | Schema Validation Engine | **Partial** — required properties per type, LocalBusiness/Organization @id consistency, systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates), schema URL consistency (a page-describing entity's `url`/`mainEntityOfPage` should match that page's real URL — catches stale schema left behind after a URL restructure), and schema-vs-visible-content mismatch (FAQPage answers and Service names should actually appear in the page's visible copy, not just the JSON-LD) are live, part of every crawl. Not built: full Rich Results Test eligibility (a separate concern from Schema.org validity, needs a new Google API integration) |
+| M | Schema Validation Engine | **Complete** — required properties per type, LocalBusiness/Organization @id consistency, systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates), schema URL consistency (a page-describing entity's `url`/`mainEntityOfPage` should match that page's real URL — catches stale schema left behind after a URL restructure), schema-vs-visible-content mismatch (FAQPage answers and Service names should actually appear in the page's visible copy, not just the JSON-LD), and Rich Results eligibility (Google's own Rich Results Test verdict — turned out to already be part of the URL Inspection API response already integrated for indexation, so no new Google API was actually needed) are all live |
 | P | Guided Roadmap (`/action-plan`) | **Complete** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page, with in-app buttons to mark a finding done/ignored/false-positive (a server action, `lib/actions/findingActions.ts`). Status carries forward across crawls (`lib/findings/createFinding.ts` checks the prior crawl for a matching finding and carries IGNORED/FALSE_POSITIVE/ACCEPTED onto the new one — COMPLETED deliberately does not carry forward, so a still-broken issue resurfaces as a real regression instead of staying hidden). A 30/60/90-day roadmap section (`lib/data/roadmapPlan.ts`) buckets open findings by priority + estimated effort, not priority alone, so quick mechanical fixes don't wait behind slow content work. Every finding card also has an "Exactly where to fix this" expandable with the real Shopify Admin navigation path and steps, keyed off `Finding.fixLocation`'s actual vocabulary (confirmed against live data: Theme Liquid and Content rewrite account for nearly all of it) |
 
 | R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below), regression detection, and full SEO change tracking are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. `lib/checks/changeTracking.ts` complements that with the complete audit trail underneath it — every title/meta/canonical/H1/status/schema-type-set change, not just the ones that got worse — viewable at `/change-log`. Not built: deployment verification gate (no staging environment exists yet for this app to diff against) |
@@ -258,6 +258,17 @@ Two real bugs found and fixed as a result:
   snapshots with known field differences, confirmed `logSeoChanges`
   logged exactly the 4 expected changes and correctly ignored the 2
   deliberately-unchanged fields, then deleted the test data.
+
+- Closing out Phase M turned up one more real bug of the same shape:
+  Google's own API returned an empty string (not `null`) for
+  `richResultType` on some issues, and `?? "Unknown"` doesn't catch an
+  empty string — 3 of 5 Rich Results findings shipped with a blank type
+  in the title. Fixed with `|| "Structured data"`, re-ran the check,
+  confirmed the malformed findings auto-resolved to VERIFIED and were
+  replaced by correctly-titled ones. Also worth noting: the Rich Results
+  eligibility check itself needed zero new API integration — the
+  richResultsResult field was already part of the URL Inspection
+  response the app was already calling, just never parsed.
 
 This is an ongoing exercise, not a one-time pass — the next round should
 sample Keywords findings the same way.
