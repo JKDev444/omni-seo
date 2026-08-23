@@ -42,9 +42,9 @@ const PHASES: PhaseSeed[] = [
       { title: "Deployment verification gate has no staging environment to diff against", status: TODO, notes: "This app has no staging/preview environment concept -- would need a decision on whether to build one (and how) before this Phase R task is buildable at all." },
       {
         title: "Phase V premise needs your review: research shows backlink-velocity risk is NOT well-supported by Google",
-        status: TODO,
+        status: DONE,
         notes:
-          'Researched before building anything (per your instruction). Key finding: Google\'s John Mueller has directly stated link acquisition velocity is NOT a ranking factor -- "it\'s not so much a matter of how many links you get in which time period... it doesn\'t really matter how many or in which time." What matters is whether individual links are natural, not their pace. The common SEO-industry belief that backlink outreach must be drip-fed to avoid an algorithmic penalty is not well-supported by Google\'s own statements. Separately, Mueller\'s real reasoning for splitting SITE CHANGES over time is about attribution clarity for the site owner ("if you do everything at once, you\'ll never know what to fix"), not an algorithm-safety concern -- and this app already has strong infrastructure for that (the SEO Change Tracking changelog from Phase R). Google\'s "scaled content abuse" policy is about volume + low value + manipulative intent, not volume alone -- genuine technical/schema fixes to real existing pages (what this app recommends) don\'t fall under it. Recommendation: reframe Phase V from "protect against Google penalties by drip-feeding" to "sequence work for clean before/after attribution and realistic execution capacity" -- a project-management pacing layer, not an algorithm-avoidance one. This changes the premise you proposed, so flagging for your call before designing/building anything further.',
+          'Resolved: user\'s call was to proceed with the best real industry-standard tactic rather than an algorithm-avoidance scheduler. Implemented ICE (Impact x Confidence / Effort) prioritization -- see Phase V.',
       },
     ],
   },
@@ -253,16 +253,24 @@ const PHASES: PhaseSeed[] = [
     key: "V",
     name: "Change Pacing / Drip-Feed Intelligence",
     summary: "Research-backed guidance on WHEN to make changes (rollout pacing, backlink outreach velocity), not just what to fix.",
-    status: ProjectPhaseStatus.IN_PROGRESS,
+    status: ProjectPhaseStatus.COMPLETE,
     tasks: [
       {
         title: "Research real guidance on SEO change velocity and backlink outreach pacing before designing anything",
         status: DONE,
         notes:
-          "Key finding: Google's John Mueller has stated link acquisition velocity is NOT a ranking factor -- what matters is whether links are natural, not their pace. Mueller's real reasoning for splitting site changes over time is attribution clarity for the site owner, not an algorithm-safety concern -- and this app already has that infrastructure (Phase R's change log). Recommendation: reframe from \"protect against Google penalties\" to \"sequence work for clean attribution and realistic execution capacity.\" Changes the premise originally proposed -- flagged in the FLAGS phase for a decision before designing further.",
+          "Key finding: Google's John Mueller has stated link acquisition velocity is NOT a ranking factor -- what matters is whether links are natural, not their pace. Mueller's real reasoning for splitting site changes over time is attribution clarity for the site owner, not an algorithm-safety concern. User's response: proceed with the real industry-standard tactic (ICE) rather than an algorithm-avoidance scheduler.",
       },
-      { title: "Design a pacing/scheduling layer on top of the existing 30/60/90-day roadmap", status: TODO },
-      { title: "Surface suggested rollout dates/spacing in the Action Plan", status: TODO },
+      {
+        title: "Design a pacing/scheduling layer on top of the existing 30/60/90-day roadmap",
+        status: DONE,
+        notes: "Implemented ICE (Impact x Confidence / Effort) -- the prioritization framework most SEO agencies/tools actually use, explicitly recommended for solo operators. lib/data/roadmapPlan.ts's computeIceScore() orders findings within each bucket and priority tier by real expected value, not detection date. Verified: quick-effort CRITICAL findings (score 20.0) correctly outrank same-priority findings needing more effort (score 10.0).",
+      },
+      {
+        title: "Surface suggested rollout dates/spacing in the Action Plan",
+        status: DONE,
+        notes: "Added a suggestedPerWeek pace per roadmap bucket (\"~6/week keeps this on pace\") plus two research-backed context notes in This Month: a 2-4-pieces/month content cadence benchmark, and a note on backlink outreach citing Google's own statement that speed isn't a ranking factor.",
+      },
     ],
   },
   {
