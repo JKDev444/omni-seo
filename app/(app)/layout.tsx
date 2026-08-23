@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNavShell } from "@/components/MobileNavShell";
+import { ChatWidget } from "@/components/ChatWidget";
 import { getActiveSite, getAllSites } from "@/lib/data/activeSite";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Sidebar {...sidebarProps} />
       </MobileNavShell>
       <main className="main">{children}</main>
+      <ChatWidget />
     </div>
   );
 }
