@@ -65,7 +65,7 @@ Once the single-site A-S phase list above is solid, the plan is:
 |---|---|---|
 | T | Multi-Site Support | **Partial** — the architecture is done: `lib/data/activeSite.ts` (cookie-based active-site resolution) replaced every page/data function's hardcoded `V1_DOMAIN`, and a sidebar site switcher (`components/SiteSwitcher.tsx`) appears automatically once more than one site exists. Verified live with a synthetic second site — data isolation, empty-state rendering, and the stale-cookie-after-deletion fallback all confirmed working, then cleaned up. Not done: actually onboarding `esco-pacific.com` as a real second site — needs the user to grant the service account access to Esco's Search Console/GA4 properties first, plus a decision on DataForSEO spend for a second site, before its first real crawl runs |
 | U | UI/UX Design Polish | **Complete** — mocked up two visual directions as a design canvas first (see below), user picked "Spacious & Editorial." Rolled out: bigger radii/shadows and solid-fill priority badges (`styles/tokens.css`), a grouped 6-section sidebar nav with real active-page highlighting for the first time (`components/NavLinks.tsx`), and a structural rebuild of the Action Plan page (elevated finding cards with a priority-colored left border, roadmap tiles with SVG progress rings). Because the shared classes changed, every other page inherited the new look automatically — verified live on Dashboard and Indexation too. Mobile navigation (`components/MobileNavShell.tsx`) adds a hamburger-triggered drawer with the same nav, using plain conditional mounting rather than a slide animation — see Known limitations for why |
-| V | Change Pacing / Drip-Feed Intelligence | **Research done, design paused pending a decision** — see "Change pacing: what the research actually found" below. The premise this phase started from (drip-feed changes/backlinks to avoid an algorithmic penalty) isn't well-supported by Google's own statements, so the design needs to change before building anything |
+| V | Change Pacing / Drip-Feed Intelligence | **Complete** — see "Change pacing: what the research actually found" below. Rather than build an algorithm-avoidance scheduler on a premise Google's own statements don't support, implemented ICE (Impact × Confidence ÷ Effort) — the prioritization framework most SEO agencies/tools actually use, explicitly recommended for solo operators. `lib/data/roadmapPlan.ts`'s `computeIceScore()` now orders every list of findings (the 30/60/90 roadmap buckets, and Do Now/This Month/Ongoing) by real expected value instead of detection date, plus a realistic "~N/week keeps this on pace" suggestion per bucket and research-backed cadence notes for content and backlink outreach |
 | W | AI Chat Assistant | **Complete** — a floating chat widget on every page (`components/ChatWidget.tsx`), grounded in a real-data digest built from the same `getActionPlanData`/`getDashboardData` functions every other page uses (`lib/data/chatContext.ts`) — never a second source of truth for the same numbers. Verified live: a factual question matched an independently-queried real count exactly, an open-ended "what are today's top tasks" question correctly cited real findings and real maintenance tasks, and a question outside the digest (backlink trends) was correctly declined instead of fabricated |
 
 Tracked in the Project Tracker (`/project-tracker`) alongside everything else.
@@ -100,12 +100,23 @@ about change/backlink pacing rather than building on assumption:
   low-value-page pattern the policy targets.
 
 **Conclusion:** the phase's original framing ("protect against Google
-penalties by drip-feeding") doesn't hold up. The recommended reframe is
-a project-management pacing layer instead — sequencing work for clean
-before/after attribution and realistic execution capacity, not
-algorithm avoidance. This changes the phase's shape enough that it's
-flagged in the Project Tracker's Red Flags phase for a decision before
-any design/build work continues.
+penalties by drip-feeding") doesn't hold up. Flagged for a decision
+before building anything further; the user's call was to apply the
+real industry-standard tactic instead of an algorithm-avoidance
+scheduler — **ICE (Impact × Confidence ÷ Effort)**, the prioritization
+framework most SEO agencies/tools actually use (explicitly recommended
+for solo operators specifically, since it needs no special tooling).
+`lib/data/roadmapPlan.ts`'s `computeIceScore()` reuses the Impact
+weighting the health score already uses (`dashboard.ts`'s
+`PRIORITY_WEIGHT`, now exported) and each Finding's own `confidence`
+field, divided by the existing quick/medium/long effort tiers — so
+every list of findings in the app is now ordered by real expected
+value, not by an accident of when a check happened to detect it.
+Verified against real data: quick-effort CRITICAL findings score 20.0
+and correctly outrank same-priority findings needing more effort
+(10.0). A realistic "~N/week keeps this on pace" note per roadmap
+bucket and research-backed cadence context for content/backlink
+outreach round it out — see Phase V's row above.
 
 ## Automation
 
