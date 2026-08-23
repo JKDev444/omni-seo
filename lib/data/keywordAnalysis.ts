@@ -10,8 +10,33 @@ export interface CannibalizationIssue {
   pages: { url: string; impressions: number; clicks: number; avgPosition: number }[];
 }
 
-/** Multiple owned URLs both getting real impressions for the same query — may be intentional segmentation, may be splitting authority. */
+/**
+ * Branded/navigational queries (the business's own name, e.g. "omni
+ * centers", "omni center olympia") naturally spread across many owned
+ * pages -- Google distributing a brand search across the homepage,
+ * About, specials, etc. is normal and not the same actionable problem
+ * as a service keyword ("tixel treatment") splitting authority between
+ * two competing pages. Confirmed live: of 58 raw cannibalization
+ * matches, several of the largest (by page count) were branded queries
+ * like "omni centers" spread across 16 pages -- real data, but not
+ * useful in the same list as a genuine service-keyword split.
+ *
+ * Derived from the site's own domain rather than hardcoded, so this
+ * still works once a second site (e.g. esco-pacific.com) is onboarded:
+ * "omnicenters.com" -> "omnicenters", matching a query's first word
+ * ("omni") via prefix in either direction.
+ */
+function isBrandedQuery(query: string, domain: string): boolean {
+  const domainLabel = domain.split(".")[0].split("-")[0].toLowerCase();
+  const firstWord = query.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (!firstWord || !domainLabel) return false;
+  return domainLabel.startsWith(firstWord) || firstWord.startsWith(domainLabel);
+}
+
+/** Multiple owned URLs both getting real impressions for the same query — may be intentional segmentation, may be splitting authority. Excludes branded/navigational queries (see isBrandedQuery). */
 export async function detectCannibalization(siteId: string, minImpressions = 10): Promise<CannibalizationIssue[]> {
+  const site = await prisma.site.findUniqueOrThrow({ where: { id: siteId }, select: { domain: true } });
+
   const metrics = await prisma.gscMetric.findMany({
     where: { siteId, query: { not: null }, page: { not: null } },
     select: { query: true, page: true, impressions: true, clicks: true, position: true },
@@ -32,6 +57,7 @@ export async function detectCannibalization(siteId: string, minImpressions = 10)
 
   const issues: CannibalizationIssue[] = [];
   for (const [query, pages] of byQuery) {
+    if (isBrandedQuery(query, site.domain)) continue;
     const withImpressions = [...pages.entries()].filter(([, e]) => e.impressions >= minImpressions);
     if (withImpressions.length < 2) continue;
     issues.push({
