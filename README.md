@@ -383,12 +383,13 @@ category is complete as of 2026-08-22.
   `Cannot find module './NNN.js'` or `__webpack_modules__[moduleId] is
   not a function`). Fix is always `rm -rf .next` + restart, never a code
   bug when it happens.
-- A `qa-test@internal.local` login account exists (created via
-  `scripts/createUser.ts`) for browser-based UI verification without
-  needing the real account's credentials. Delete it with
-  `npx tsx scripts/deleteUser.ts qa-test@internal.local` once it's no
-  longer needed, or leave it — it's a normal login account like any
-  other, no special privileges.
+- A `qa-test@internal.local` login account is created as needed (via
+  `scripts/createUser.ts`, which upserts) for browser-based UI
+  verification without touching the real account's credentials, and
+  deleted again afterward (`npx tsx scripts/deleteUser.ts
+  qa-test@internal.local`) rather than left sitting with a known
+  password. It's a normal login account with no special privileges
+  either way — recreate it anytime verification needs it.
 
 ## Local development
 ```bash
@@ -427,6 +428,21 @@ don't touch auth or the Vercel Cron route).
   configured — see "Before you rely on this" below for the one
   verification step that hasn't been done yet.
 
+## What "verified live" means in this doc
+Every "verified live" / "real data" claim in this README (this one and
+all the phase-status rows above) was checked against the same real
+Neon production database, but for most of the project that check ran
+through the **local dev server**, not the deployed Vercel app itself —
+those are different things (build output, environment variables set in
+Vercel, edge runtime behavior can all differ from local). On
+2026-08-23 the actual production deployment at the live app URL was
+opened directly for the first time and checked page-by-page (Action
+Plan, Field Guide, Keywords) — all confirmed working with real,
+current data. Treat that date as when "verified in production" and
+"verified against real data locally" actually converged; anything
+verified before it was the latter, not the former, even where earlier
+text just says "live."
+
 ## Before you rely on this (verify before launch)
 Everything below is real, working code with real data behind it — but
 these specific things have not been end-to-end verified yet, because
@@ -439,11 +455,23 @@ they only matter once the app runs unattended:
   checks, 180 content-analysis rows, etc.) — but the *scheduled,
   unattended* path (secrets configured in GitHub → workflow fires on
   schedule → completes within its 60-minute timeout → writes to the
-  same production database) has not been proven. **Action needed:**
-  add the 7 secrets listed above to GitHub (Settings → Secrets and
-  variables → Actions), then trigger each workflow once manually from
-  the Actions tab (`workflow_dispatch`) and confirm it finishes green.
-  Do this once before trusting the Monday/1st-of-month schedule.
+  same production database) has not been proven. Whether the 7 GitHub
+  secrets are even set is itself unverified — zero runs is consistent
+  with either "not set" or "set but never triggered," and there's no
+  way to check which from outside GitHub's own settings page.
+  **Action needed:** add the 7 secrets listed above to GitHub (Settings
+  → Secrets and variables → Actions), then trigger each workflow once
+  manually from the Actions tab (`workflow_dispatch`) and confirm it
+  finishes green. Do this once before trusting the Monday/1st-of-month
+  schedule.
+- **Keyword discovery's real cost**: DataForSEO's published price for
+  the Labs `keyword_ideas` endpoint is $0.012 per request plus $0.00012
+  per keyword returned ([DataForSEO Labs vs Google Ads API help
+  page](https://dataforseo.com/help-center/dataforseo-labs-api-vs-google-ads-api)) —
+  at this app's `limit: 100` per run, that's roughly $0.024/run, once a
+  month. Cheap at today's published rate, but that rate isn't verified
+  against your actual DataForSEO account/contract — check your
+  dashboard before assuming it.
 - **Core Web Vitals has only 1 stored data point** — expected, given
   the CrUX threshold issue above, but worth knowing before treating
   `/performance` as fully populated.
