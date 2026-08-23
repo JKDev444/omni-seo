@@ -282,8 +282,22 @@ Two real bugs found and fixed as a result:
   richResultsResult field was already part of the URL Inspection
   response the app was already calling, just never parsed.
 
-This is an ongoing exercise, not a one-time pass — the next round should
-sample Keywords findings the same way.
+- Closed out the last flagged category, Keywords: sampled real
+  cannibalization/decay/CTR output against live GSC data
+  (`lib/data/keywordAnalysis.ts`). The cannibalization check itself
+  turned out well-calibrated (54 of 58 flagged issues had a genuinely
+  meaningful second-page share) — but several of the largest were
+  branded/navigational queries ("omni centers" spread across 16 pages),
+  real data but not the same actionable problem as a service keyword
+  splitting traffic between two competing pages. Added `isBrandedQuery`,
+  deriving the brand token from the site's own domain (not hardcoded,
+  so it keeps working once a second site is onboarded) — 58 raw matches
+  dropped to 50 after excluding exactly the branded ones.
+
+Every original check category has now been sampled against live data at
+least once. This doesn't mean the audit is "done" — it's a standing
+habit, not a one-time pass — but the initial sweep across every
+category is complete as of 2026-08-22.
 
 ## Architecture notes worth knowing before changing things
 - `auth.config.ts` is deliberately Prisma-free — shared with
