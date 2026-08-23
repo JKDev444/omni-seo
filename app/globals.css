@@ -23,12 +23,12 @@ a {
 }
 
 .sidebar {
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
-  padding: var(--space-5) var(--space-4);
+  background: transparent;
+  padding: var(--space-6) var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -39,11 +39,12 @@ a {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: 0 var(--space-2);
 }
 
 .sidebar-brand-mark {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-sm);
   background: var(--color-accent);
   display: inline-flex;
@@ -55,20 +56,61 @@ a {
   font-weight: 700;
 }
 
+/* ---- Site switcher pill ---- */
+.sidebar-site-pill,
+.sidebar-site-select {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-card);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  cursor: default;
+}
+
+.sidebar-site-select {
+  cursor: pointer;
+  appearance: none;
+}
+
+.sidebar-site-select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nav-group-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-ink-faint);
+  padding: var(--space-3) var(--space-2) var(--space-1);
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  padding: 7px var(--space-2);
+  border-radius: var(--radius-pill);
   color: var(--color-ink-muted);
-  font-size: var(--text-sm);
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -78,27 +120,30 @@ a {
 }
 
 .sidebar-link.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-weight: 600;
 }
 
 .sidebar-site {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-foot {
   margin-top: auto;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-  font-size: var(--text-xs);
-  color: var(--color-ink-faint);
+  padding-top: var(--space-3);
 }
 
 .sidebar-account {
-  padding-top: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  padding: 0 var(--space-2);
 }
 
 .sidebar-account-email {
-  font-size: var(--text-xs);
+  font-size: 11.5px;
   color: var(--color-ink-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -107,20 +152,21 @@ a {
 
 .sidebar-signout-btn {
   appearance: none;
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface);
+  border: none;
+  background: none;
   color: var(--color-ink-muted);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: 500;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
   font-family: var(--font-body);
   cursor: pointer;
   text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  width: fit-content;
 }
 
 .sidebar-signout-btn:hover {
-  background: var(--color-surface-sunken);
   color: var(--color-ink);
 }
 
@@ -223,41 +269,15 @@ a {
   opacity: 0.9;
 }
 
-.sidebar-site strong {
-  display: block;
-  color: var(--color-ink-muted);
-  font-weight: 600;
-  font-size: var(--text-sm);
-}
-
-.sidebar-site-select {
-  display: block;
-  width: 100%;
-  margin-bottom: 2px;
-  padding: 2px 0;
-  color: var(--color-ink-muted);
-  font-weight: 600;
-  font-size: var(--text-sm);
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.sidebar-site-select:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .main {
-  padding: var(--space-6) var(--space-8);
-  max-width: 1200px;
+  padding: 44px 56px;
+  max-width: 1220px;
 }
 
 .page-header {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
@@ -265,8 +285,9 @@ a {
 
 .page-title {
   font-family: var(--font-display);
-  font-size: var(--text-2xl);
+  font-size: var(--text-3xl);
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--color-ink);
   margin: 0 0 var(--space-1) 0;
 }
@@ -275,6 +296,7 @@ a {
   color: var(--color-ink-muted);
   font-size: var(--text-sm);
   margin: 0;
+  max-width: 34rem;
 }
 
 .page-meta {
@@ -287,7 +309,6 @@ a {
 /* ---- Cards ---- */
 .card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   padding: var(--space-5);
@@ -303,6 +324,131 @@ a {
 
 .section {
   margin-bottom: var(--space-6);
+}
+
+.section-label {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-muted);
+  margin: 0 0 var(--space-4);
+}
+
+/* ---- Stat row (priority counts, etc.) ---- */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
+}
+
+.stat-card {
+  padding: 4px 4px 0;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+  margin-right: var(--space-2);
+}
+
+.stat-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  display: flex;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: var(--space-1);
+}
+
+/* ---- 30/60/90 roadmap tiles ---- */
+.roadmap-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.roadmap-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.roadmap-range {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.roadmap-count {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+/* ---- Finding cards ---- */
+.findings-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.finding-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  border-left: 4px solid var(--color-border-strong);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.finding-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.finding-card-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+}
+
+.finding-card-desc {
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+  line-height: 1.5;
+  margin: 0 0 var(--space-2);
+}
+
+.finding-card-page {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-ink-faint);
+  background: var(--color-surface-sunken);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+}
+
+.finding-card-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-self: center;
 }
 
 /* ---- Health rings ---- */
@@ -516,34 +662,38 @@ a {
   .two-col {
     grid-template-columns: 1fr;
   }
+  .main {
+    padding: var(--space-5) var(--space-4);
+  }
 }
 
 /* ---- Action Plan finding controls ---- */
 .action-btn {
   appearance: none;
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface);
+  border: none;
+  background: var(--color-surface-sunken);
   color: var(--color-ink-muted);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  padding: 6px var(--space-3);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 600;
   font-family: var(--font-body);
   cursor: pointer;
 }
 
 .action-btn:hover {
-  background: var(--color-surface-sunken);
+  background: var(--color-border);
   color: var(--color-ink);
 }
 
 .action-btn-done {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: var(--color-ink);
+  color: var(--color-canvas);
 }
 
 .action-btn-done:hover {
-  background: var(--color-accent-soft);
+  background: var(--color-ink);
+  opacity: 0.85;
 }
 
 /* ---- FilterableTable search ---- */

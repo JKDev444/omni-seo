@@ -1,24 +1,39 @@
 import { SiteSwitcher } from "@/components/SiteSwitcher";
+import { NavLinks, type NavGroup } from "@/components/NavLinks";
 
-const NAV_ITEMS = [
-  { href: "/action-plan", label: "Action Plan" },
-  { href: "/dashboard", label: "Overview" },
-  { href: "/analytics", label: "Analytics" },
-  { href: "/indexation", label: "Indexation" },
-  { href: "/performance", label: "Performance" },
-  { href: "/internal-links", label: "Internal Links" },
-  { href: "/content", label: "Content Quality" },
-  { href: "/ai-search", label: "AI Search Readiness" },
-  { href: "/keywords", label: "Keywords" },
-  { href: "/content-stacks", label: "Content Stacks" },
-  { href: "/backlinks", label: "Backlinks" },
-  { href: "/dashboard#findings", label: "Findings" },
-  { href: "/dashboard#scorecard", label: "Scorecard" },
-  { href: "/dashboard#citations", label: "Citations" },
-  { href: "/dashboard#maintenance", label: "Maintenance" },
-  { href: "/reports", label: "Reports" },
-  { href: "/change-log", label: "Change Log" },
-  { href: "/project-tracker", label: "Project Tracker" },
+// Grouped for scannability -- the flat 18-link list this replaced made
+// "where do I find X" a real friction point. The four items that used
+// to live here as separate entries (Findings/Scorecard/Citations/
+// Maintenance) are sections of Overview, not distinct destinations --
+// dropped from global nav, reachable as quick-jump anchors on that page
+// instead of permanently costing 4 of the sidebar's slots.
+const NAV_GROUPS: NavGroup[] = [
+  { label: "Workspace", items: [
+    { href: "/action-plan", label: "Action Plan" },
+    { href: "/dashboard", label: "Overview" },
+  ]},
+  { label: "Insights", items: [
+    { href: "/analytics", label: "Analytics" },
+    { href: "/indexation", label: "Indexation" },
+    { href: "/performance", label: "Performance" },
+    { href: "/internal-links", label: "Internal Links" },
+  ]},
+  { label: "Content", items: [
+    { href: "/content", label: "Content Quality" },
+    { href: "/ai-search", label: "AI Search Readiness" },
+    { href: "/content-stacks", label: "Content Stacks" },
+    { href: "/keywords", label: "Keywords" },
+  ]},
+  { label: "Growth", items: [
+    { href: "/backlinks", label: "Backlinks" },
+  ]},
+  { label: "Reports", items: [
+    { href: "/reports", label: "Reports" },
+    { href: "/change-log", label: "Change Log" },
+  ]},
+  { label: "System", items: [
+    { href: "/project-tracker", label: "Project Tracker" },
+  ]},
 ];
 
 export function Sidebar({
@@ -38,35 +53,31 @@ export function Sidebar({
         <span className="sidebar-brand-mark">O</span>
         Omni SEO
       </div>
-      <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
-          <a key={item.href} href={item.href} className="sidebar-link">
-            {item.label}
-          </a>
-        ))}
-      </nav>
+
       <div className="sidebar-site">
         {activeSite ? (
-          <>
-            {sites.length > 1 ? (
-              <SiteSwitcher sites={sites} activeSiteId={activeSite.id} />
-            ) : (
-              <strong>{activeSite.domain}</strong>
-            )}
-            <span>{activeSite.platform}</span>
-          </>
+          sites.length > 1 ? (
+            <SiteSwitcher sites={sites} activeSiteId={activeSite.id} />
+          ) : (
+            <div className="sidebar-site-pill">{activeSite.domain}</div>
+          )
         ) : (
-          <strong>No site configured</strong>
+          <div className="sidebar-site-pill">No site configured</div>
         )}
       </div>
-      {userEmail && (
-        <form action={signOutAction} className="sidebar-account">
-          <span className="sidebar-account-email">{userEmail}</span>
-          <button type="submit" className="sidebar-signout-btn">
-            Sign out
-          </button>
-        </form>
-      )}
+
+      <NavLinks groups={NAV_GROUPS} />
+
+      <div className="sidebar-foot">
+        {userEmail && (
+          <form action={signOutAction} className="sidebar-account">
+            <span className="sidebar-account-email">{userEmail}</span>
+            <button type="submit" className="sidebar-signout-btn">
+              Sign out
+            </button>
+          </form>
+        )}
+      </div>
     </aside>
   );
 }
