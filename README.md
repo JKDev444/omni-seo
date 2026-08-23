@@ -64,7 +64,7 @@ Once the single-site A-S phase list above is solid, the plan is:
 | Phase | What it is | Why this order |
 |---|---|---|
 | T | Multi-Site Support | **Partial** — the architecture is done: `lib/data/activeSite.ts` (cookie-based active-site resolution) replaced every page/data function's hardcoded `V1_DOMAIN`, and a sidebar site switcher (`components/SiteSwitcher.tsx`) appears automatically once more than one site exists. Verified live with a synthetic second site — data isolation, empty-state rendering, and the stale-cookie-after-deletion fallback all confirmed working, then cleaned up. Not done: actually onboarding `esco-pacific.com` as a real second site — needs the user to grant the service account access to Esco's Search Console/GA4 properties first, plus a decision on DataForSEO spend for a second site, before its first real crawl runs |
-| U | UI/UX Design Polish | A real design pass so the app feels like a modern SaaS product. Deliberately sequenced *after* multi-site, not before — building nav/layout for one site and then reworking it for a switcher would waste the polish pass |
+| U | UI/UX Design Polish | **Partial** — mocked up two visual directions as a design canvas first (see below), user picked "Spacious & Editorial." Rolled out: bigger radii/shadows and solid-fill priority badges (`styles/tokens.css`), a grouped 6-section sidebar nav with real active-page highlighting for the first time (`components/NavLinks.tsx`), and a structural rebuild of the Action Plan page (elevated finding cards with a priority-colored left border, roadmap tiles with SVG progress rings). Because the shared classes changed, every other page inherited the new look automatically — verified live on Dashboard and Indexation too. Not done: the responsive/mobile pass — mobile currently just hides the sidebar entirely with no alternative nav, a real gap, not yet addressed |
 | V | Change Pacing / Drip-Feed Intelligence | Real research first (there's no authoritative API for "how fast is too fast" on SEO changes or backlink outreach — this is judgment, not a deterministic check), then a scheduling layer on top of the existing 30/60/90-day roadmap that spaces out *when* Action Plan items get surfaced |
 | W | AI Chat Assistant | A SearchAtlas-style chat ("What are today's tasks?") over the site's real Finding/Action Plan/Scorecard data. Sequenced last since it's only trustworthy once the underlying data is — which is what the ongoing accuracy audit has been building toward — and cheap to add on top of a stable, multi-site, polished app using the Anthropic integration already in place |
 
@@ -168,6 +168,10 @@ npx tsx scripts/runBacklinksCheck.ts [domain] [competitor1,competitor2,...]
   pearlplasticsurgery.com, olymedspa.com) — algorithmic competitor
   discovery was tried and rejected (surfaced Facebook/Instagram/YouTube,
   not real local competitors).
+- **No mobile navigation.** `@media (max-width: 900px)` hides the
+  sidebar entirely with no replacement (no hamburger menu, no drawer) —
+  below 900px wide there's currently no way to navigate between pages
+  at all. Tracked as Phase U's remaining "Responsive/mobile pass" task.
 
 ## Project Tracker
 `/project-tracker` is a live phase/task board (`ProjectPhase`/`ProjectTask`
