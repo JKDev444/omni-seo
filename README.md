@@ -15,7 +15,7 @@ context: this is the whole picture as of the last commit.
 Next.js 15 (App Router) → GitHub (JKDev444/omni-seo) → Vercel (hosting +
 Cron) → Neon Postgres → Prisma → NextAuth (Credentials, no OAuth for login)
 
-## Status: Phases A–N, P, Q complete; F caveated, R partial; K skipped by choice, O out of scope (no products)
+## Status: Phases A–R, T–W complete; F caveated, K/O skipped by choice; S (auto-fix) and Esco onboarding intentionally not started — see "Before you rely on this" below
 
 **The core intent of this app**: not just a pile of diagnostic reports —
 a tool that tells the user everything they need to do, on whatever
@@ -43,7 +43,7 @@ exists for going deep on one specific thing.
 | M | Schema Validation Engine | **Complete** — required properties per type, LocalBusiness/Organization @id consistency, systemic-gap detection (consolidates the same schema gap across 3+ pages into one finding pointing at the shared template, instead of N near-duplicates), schema URL consistency (a page-describing entity's `url`/`mainEntityOfPage` should match that page's real URL — catches stale schema left behind after a URL restructure), schema-vs-visible-content mismatch (FAQPage answers and Service names should actually appear in the page's visible copy, not just the JSON-LD), and Rich Results eligibility (Google's own Rich Results Test verdict — turned out to already be part of the URL Inspection API response already integrated for indexation, so no new Google API was actually needed) are all live |
 | P | Guided Roadmap (`/action-plan`) | **Complete** — Do Now / This Month / Ongoing unified action plan, now the post-login landing page, with in-app buttons to mark a finding done/ignored/false-positive (a server action, `lib/actions/findingActions.ts`). Status carries forward across crawls (`lib/findings/createFinding.ts` checks the prior crawl for a matching finding and carries IGNORED/FALSE_POSITIVE/ACCEPTED onto the new one — COMPLETED deliberately does not carry forward, so a still-broken issue resurfaces as a real regression instead of staying hidden). A 30/60/90-day roadmap section (`lib/data/roadmapPlan.ts`) buckets open findings by priority + estimated effort, not priority alone, so quick mechanical fixes don't wait behind slow content work. Every finding card also has an "Exactly where to fix this" expandable with the real Shopify Admin navigation path and steps, keyed off `Finding.fixLocation`'s actual vocabulary (confirmed against live data: Theme Liquid and Content rewrite account for nearly all of it) |
 
-| R | Automation + regression detection | **Partial** — scheduled sync (see Automation section below), regression detection, and full SEO change tracking are live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. `lib/checks/changeTracking.ts` complements that with the complete audit trail underneath it — every title/meta/canonical/H1/status/schema-type-set change, not just the ones that got worse — viewable at `/change-log`. Not built: deployment verification gate (no staging environment exists yet for this app to diff against) |
+| R | Automation + regression detection | **Complete** — scheduled sync (see Automation section below), regression detection, full SEO change tracking, and the deployment verification gate are all live. `lib/checks/regressionDetection.ts` diffs each crawl's PageSnapshot against the site's previous crawl (title/meta/H1/canonical/schema loss, status code getting worse), consolidating the same regression across 3+ pages into one finding pointing at the likely shared cause. `lib/checks/changeTracking.ts` complements that with the complete audit trail underneath it — every title/meta/canonical/H1/status/schema-type-set change, not just the ones that got worse — viewable at `/change-log`. The deployment verification gate (`/deploy-check`) needed no new staging infrastructure — Shopify's own theme preview URLs (`?preview_theme_id=`) are a real, already-available surface: paste one or more preview URLs, it runs the same checks a real crawl runs and diffs the result against the live production page at the same path |
 
 | N | AI Search Readiness (`/ai-search`) | **Live, real data** — entity clarity, citation readiness, extractability, and direct-answer-block detection per page, LLM-assisted (same pattern as Phase H, with every lesson from it applied from the start — compact JSON, brace-repair, timeout, real max_tokens headroom). Not a claim of measuring actual AI-citation rankings (needs a paid tracking service like Otterly.ai/Peec AI) — scores the on-page signals that make citation more likely. Runs monthly via GitHub Actions alongside the other LLM checks |
 
@@ -190,7 +190,10 @@ when the first version tried).
 `Site.dataForSeoLocationCode` (currently `1027784` = Tumwater, WA) and
 `Site.dataForSeoLanguageCode` control where rank checks are targeted.
 
-## Manual sync scripts (Vercel Cron will call these once Phase R exists)
+## Manual sync scripts
+Most of these now also run automatically (see Automation above) — this
+list is for one-off backfills, re-runs after a fix, or running something
+sooner than its schedule.
 ```
 npx tsx scripts/runCrawl.ts [domain]                    # full crawl — sitemap discovery, on-page checks, internal link graph
 npx tsx scripts/syncAnalytics.ts [domain]                # GSC + GA4
@@ -418,5 +421,37 @@ don't touch auth or the Vercel Cron route).
 
 ## Deployment
 - Push to `main` → Vercel auto-deploys.
-- No Cron job wired up yet (Phase R) — all sync scripts above are run
-  manually for now.
+- Vercel Cron and the two GitHub Actions workflows (see Automation
+  above) handle ongoing data sync automatically once their secrets are
+  configured — see "Before you rely on this" below for the one
+  verification step that hasn't been done yet.
+
+## Before you rely on this (verify before launch)
+Everything below is real, working code with real data behind it — but
+these specific things have not been end-to-end verified yet, because
+they only matter once the app runs unattended:
+
+- **The two GitHub Actions workflows have never actually run — 0 runs
+  on record**, checked directly against the Actions tab on
+  2026-08-23. The code is correct and every script it calls has been
+  run manually and produces real data (117 keywords tracked, 122 rank
+  checks, 180 content-analysis rows, etc.) — but the *scheduled,
+  unattended* path (secrets configured in GitHub → workflow fires on
+  schedule → completes within its 60-minute timeout → writes to the
+  same production database) has not been proven. **Action needed:**
+  add the 7 secrets listed above to GitHub (Settings → Secrets and
+  variables → Actions), then trigger each workflow once manually from
+  the Actions tab (`workflow_dispatch`) and confirm it finishes green.
+  Do this once before trusting the Monday/1st-of-month schedule.
+- **Core Web Vitals has only 1 stored data point** — expected, given
+  the CrUX threshold issue above, but worth knowing before treating
+  `/performance` as fully populated.
+- **No keyword *discovery* tool yet** — `/keywords` tracks rank
+  position and pulls search volume for keywords you already added (via
+  `seedKeywords.ts` or suggestions pulled from queries the site already
+  gets impressions for). It does not surface brand-new keyword ideas
+  the site doesn't rank for at all — the actual "which keywords are
+  worth going after" research step SearchAtlas/Semrush/Ahrefs/Google
+  Keyword Planner do. DataForSEO (already integrated) has a Keyword
+  Ideas / related-keywords endpoint that isn't wired up yet — see the
+  walkthrough for the recommendation on this.
