@@ -8,6 +8,7 @@
  * without needing new columns or touching every check file.
  */
 import type { FindingWithPage } from "@/lib/findings/getOpenFindings";
+import { PRIORITY_WEIGHT } from "@/lib/data/dashboard";
 
 export type EffortTier = "quick" | "medium" | "long";
 
@@ -41,6 +42,31 @@ const CHECKSTEP_EFFORT: Record<string, EffortTier> = {
 
 export function estimateEffort(checkStep: string): EffortTier {
   return CHECKSTEP_EFFORT[checkStep] ?? "medium";
+}
+
+// Relative time-cost between tiers -- not measured minutes, just the
+// rough multiplier a "medium" or "long" fix costs over a "quick" one,
+// used only to rank within a bucket.
+const EFFORT_WEIGHT: Record<EffortTier, number> = { quick: 1, medium: 2, long: 4 };
+
+/**
+ * ICE (Impact x Confidence / Effort) is the prioritization framework
+ * most SEO agencies and tools actually use -- explicitly recommended
+ * for solo operators/small teams specifically because it needs no
+ * special tooling, just the three inputs every Finding already has:
+ * Impact (the same priority-tier weighting the health score already
+ * uses, so this doesn't invent a second scale), Confidence (the
+ * Finding's own confidence field -- a 60%-confidence heuristic
+ * shouldn't outrank a 100%-confidence deterministic check of the same
+ * priority), and Effort (estimateEffort above). Used to order findings
+ * within a day-bucket, not to decide which bucket they land in --
+ * that's still priority + effort together (see computeRoadmapPlan).
+ */
+export function computeIceScore(f: FindingWithPage): number {
+  const impact = PRIORITY_WEIGHT[f.priority];
+  const confidence = f.confidence / 100;
+  const effort = EFFORT_WEIGHT[estimateEffort(f.checkStep)];
+  return (impact * confidence) / effort;
 }
 
 export interface FixGuide {
@@ -93,6 +119,10 @@ export interface RoadmapBucket {
   count: number;
   quickWinCount: number;
   topCategories: { checkStep: string; count: number }[];
+  /** Findings in this bucket, ordered by ICE score (highest expected value first). */
+  orderedFindings: FindingWithPage[];
+  /** A realistic "close roughly N/week" framing based on a 4-week bucket -- guidance, not a rule. */
+  suggestedPerWeek: number;
 }
 
 export interface RoadmapPlan {
@@ -111,12 +141,16 @@ function topCategoriesFor(findings: FindingWithPage[]): { checkStep: string; cou
 }
 
 function buildBucket(label: string, dayRange: string, findings: FindingWithPage[]): RoadmapBucket {
+  const orderedFindings = [...findings].sort((a, b) => computeIceScore(b) - computeIceScore(a));
+
   return {
     label,
     dayRange,
     count: findings.length,
     quickWinCount: findings.filter((f) => estimateEffort(f.checkStep) === "quick").length,
     topCategories: topCategoriesFor(findings),
+    orderedFindings,
+    suggestedPerWeek: findings.length === 0 ? 0 : Math.max(1, Math.ceil(findings.length / 4)),
   };
 }
 

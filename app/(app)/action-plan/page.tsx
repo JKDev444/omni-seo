@@ -113,9 +113,14 @@ function RoadmapCard({ bucket, maxCount }: { bucket: RoadmapBucket; maxCount: nu
       </div>
       <div className="roadmap-count data-value">{bucket.count}</div>
       <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, margin: "0 0 6px" }}>{bucket.label.split(": ")[1] ?? bucket.label}</p>
-      <p style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-muted)", margin: "0 0 var(--space-2)" }}>
+      <p style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-muted)", margin: "0 0 4px" }}>
         {bucket.quickWinCount > 0 ? `${bucket.quickWinCount} are quick, mechanical fixes` : "mostly content/authority work"}
       </p>
+      {bucket.suggestedPerWeek > 0 && (
+        <p style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-faint)", margin: "0 0 var(--space-2)" }}>
+          ~{bucket.suggestedPerWeek}/week keeps this on pace
+        </p>
+      )}
       {bucket.topCategories.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-faint)" }}>
           {bucket.topCategories.map((c) => (
@@ -281,10 +286,15 @@ export default async function ActionPlanPage() {
 
           {data.thisMonth.contentStackGaps.length > 0 && (
             <div className="card" style={{ marginBottom: "var(--space-4)" }}>
-              <h3 style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-2)" }}>
+              <h3 style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-1)" }}>
                 Content clusters needing work ({data.thisMonth.contentStackGaps.length}) — see{" "}
                 <a href="/content-stacks">Content Stacks</a> for full detail
               </h3>
+              <p style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-faint)", marginBottom: "var(--space-3)" }}>
+                Typical agency pace for a site this size is 2–4 published pieces a month — publishing consistently
+                beats a single big batch, both for realistic execution and for reading which piece actually moved
+                the needle.
+              </p>
               <table className="table">
                 <thead>
                   <tr>
@@ -310,9 +320,13 @@ export default async function ActionPlanPage() {
 
           {data.thisMonth.backlinkOutreach.length > 0 && (
             <div className="card">
-              <h3 style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-2)" }}>
+              <h3 style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-1)" }}>
                 Top backlink outreach targets — see <a href="/backlinks">Backlinks</a> for the full 150-domain list
               </h3>
+              <p style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-faint)", marginBottom: "var(--space-3)" }}>
+                Google has stated acquisition speed itself isn't a ranking factor — what matters is that each link is
+                genuine. Pace outreach to what you can realistically research and personalize, not to hit a number.
+              </p>
               <table className="table">
                 <thead>
                   <tr>

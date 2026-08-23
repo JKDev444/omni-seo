@@ -27,7 +27,10 @@ export interface DashboardData {
   };
 }
 
-const PRIORITY_WEIGHT: Record<Priority, number> = {
+// Exported for reuse in roadmapPlan.ts's ICE scoring -- the same
+// Impact-per-priority-tier weighting shouldn't drift into two different
+// tables that quietly disagree.
+export const PRIORITY_WEIGHT: Record<Priority, number> = {
   CRITICAL: 20,
   HIGH: 10,
   MEDIUM: 5,

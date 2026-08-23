@@ -12,7 +12,7 @@ import { getActiveSite } from "@/lib/data/activeSite";
 import { getActiveMaintenanceWeek } from "@/lib/maintenance/seedMonth";
 import { getContentStackCompleteness } from "@/lib/data/contentStacks";
 import { getOpenFindingsForSite, type FindingWithPage } from "@/lib/findings/getOpenFindings";
-import { computeRoadmapPlan, type RoadmapPlan } from "@/lib/data/roadmapPlan";
+import { computeRoadmapPlan, computeIceScore, type RoadmapPlan } from "@/lib/data/roadmapPlan";
 
 export type { FindingWithPage };
 
@@ -76,6 +76,12 @@ export async function getActionPlanData(): Promise<ActionPlanData> {
 
   const byPriority: Record<Priority, FindingWithPage[]> = { CRITICAL: [], HIGH: [], MEDIUM: [], LOW: [] };
   for (const f of openFindings) byPriority[f.priority].push(f);
+  // ICE (Impact x Confidence / Effort) ordering within each tier, not
+  // just detection-date order -- see roadmapPlan.ts's computeIceScore
+  // for why this is the actual "what to do first" signal.
+  for (const tier of Object.keys(byPriority) as Priority[]) {
+    byPriority[tier].sort((a, b) => computeIceScore(b) - computeIceScore(a));
+  }
 
   const [ctrRewrites, stackCompleteness, backlinkGap, maintenance] = await Promise.all([
     prisma.ctrRewriteSuggestion.findMany({ where: { siteId: site.id }, orderBy: { impressions: "desc" }, take: 10 }),
