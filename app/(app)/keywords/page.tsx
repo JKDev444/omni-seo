@@ -1,5 +1,12 @@
 import { getKeywordsPageData } from "@/lib/data/keywordsPageData";
 import { FilterableTable } from "@/components/FilterableTable";
+import { KeywordIdeaActions } from "@/components/KeywordIdeaActions";
+
+const RECOMMENDATION_STYLE: Record<string, { background: string; color: string }> = {
+  PURSUE: { background: "var(--color-success-soft)", color: "var(--color-success)" },
+  CONSIDER: { background: "var(--color-warning-soft)", color: "var(--color-warning)" },
+  SKIP: { background: "var(--color-surface-sunken)", color: "var(--color-ink-faint)" },
+};
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +49,7 @@ export default async function KeywordsPage() {
     );
   }
 
-  if (data.keywords.length === 0) {
+  if (data.keywords.length === 0 && data.ideas.length === 0) {
     return (
       <div>
         <div className="page-header">
@@ -60,9 +67,9 @@ export default async function KeywordsPage() {
             position — title/meta rewrite candidates).
           </p>
           <ol style={{ paddingLeft: "var(--space-5)", fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", lineHeight: 1.8 }}>
-            <li>Set <code>DATAFORSEO_LOGIN</code> / <code>DATAFORSEO_PASSWORD</code></li>
-            <li>See suggestions: <code>npx tsx scripts/seedKeywords.ts suggest</code></li>
-            <li>Add keywords: <code>npx tsx scripts/seedKeywords.ts accept omnicenters.com &quot;phrase 1&quot; &quot;phrase 2&quot;</code></li>
+            <li>Discover keyword ideas worth going after: <code>npx tsx scripts/runKeywordDiscovery.ts</code></li>
+            <li>Or see suggestions from existing traffic: <code>npx tsx scripts/seedKeywords.ts suggest</code></li>
+            <li>Add keywords manually: <code>npx tsx scripts/seedKeywords.ts accept omnicenters.com &quot;phrase 1&quot; &quot;phrase 2&quot;</code></li>
             <li>Run rank checks: <code>npx tsx scripts/runKeywordRankings.ts</code></li>
           </ol>
         </div>
@@ -80,33 +87,75 @@ export default async function KeywordsPage() {
         <div className="page-meta">{data.keywords.length} tracked</div>
       </div>
 
-      <div className="section card">
-        <h2 className="card-title">Tracked keywords</h2>
-        <FilterableTable
-          headers={["Keyword", "Target page", "Volume", "Position", "Trend", "Local pack", "AI Overview", "Last checked"]}
-          searchPlaceholder="Search keywords…"
-          rows={data.keywords.map((k) => {
-            const targetPath = k.targetUrl ? pathFromUrl(k.targetUrl) : "";
-            return {
-              key: k.id,
-              searchText: `${k.phrase} ${targetPath}`,
-              numericCols: [2, 3, 4],
-              cells: [
-                k.phrase,
-                targetPath || "—",
-                k.searchVolume ?? "—",
-                k.latestPosition ?? "not found",
-                <span key="trend" className={trendClass(k.latestPosition, k.previousPosition)}>
-                  {trendArrow(k.latestPosition, k.previousPosition)}
-                </span>,
-                k.localPack ? "Yes" : "—",
-                k.aiOverview ? "Yes" : "—",
-                k.lastCheckedAt ? new Date(k.lastCheckedAt).toLocaleDateString() : "never",
-              ],
-            };
-          })}
-        />
-      </div>
+      {data.ideas.length > 0 && (
+        <div className="section card">
+          <h2 className="card-title">Keyword opportunities</h2>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", marginBottom: "var(--space-3)" }}>
+            Real keyword ideas the site doesn&apos;t track yet, from DataForSEO Labs, seeded from your actual service
+            pages. Volume is national (DataForSEO&apos;s keyword database isn&apos;t granular below the country
+            level) — <strong>Pursue</strong>/<strong>Consider</strong>/<strong>Skip</strong> already accounts for
+            that, weighing down generic national head terms in favor of realistic, locally-relevant, or low-competition
+            opportunities. Read the reasoning before tracking one.
+          </p>
+          {data.ideas.map((idea) => (
+            <div
+              key={idea.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "var(--space-4)",
+                padding: "var(--space-3) 0",
+                borderBottom: "1px solid var(--color-border)",
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "4px" }}>
+                  <span className="tier-badge" style={RECOMMENDATION_STYLE[idea.recommendation]}>
+                    {idea.recommendation}
+                  </span>
+                  <strong>{idea.phrase}</strong>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: "var(--color-ink-faint)" }}>
+                    {idea.searchVolume ?? "—"}/mo · {idea.difficulty !== null ? `difficulty ${idea.difficulty}` : idea.competitionLevel ?? "unknown"}
+                    {idea.intent ? ` · ${idea.intent}` : ""}
+                  </span>
+                </div>
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-muted)", margin: 0 }}>{idea.rationale}</p>
+              </div>
+              <KeywordIdeaActions ideaId={idea.id} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.keywords.length > 0 && (
+        <div className="section card">
+          <h2 className="card-title">Tracked keywords</h2>
+          <FilterableTable
+            headers={["Keyword", "Target page", "Volume", "Position", "Trend", "Local pack", "AI Overview", "Last checked"]}
+            searchPlaceholder="Search keywords…"
+            rows={data.keywords.map((k) => {
+              const targetPath = k.targetUrl ? pathFromUrl(k.targetUrl) : "";
+              return {
+                key: k.id,
+                searchText: `${k.phrase} ${targetPath}`,
+                numericCols: [2, 3, 4],
+                cells: [
+                  k.phrase,
+                  targetPath || "—",
+                  k.searchVolume ?? "—",
+                  k.latestPosition ?? "not found",
+                  <span key="trend" className={trendClass(k.latestPosition, k.previousPosition)}>
+                    {trendArrow(k.latestPosition, k.previousPosition)}
+                  </span>,
+                  k.localPack ? "Yes" : "—",
+                  k.aiOverview ? "Yes" : "—",
+                  k.lastCheckedAt ? new Date(k.lastCheckedAt).toLocaleDateString() : "never",
+                ],
+              };
+            })}
+          />
+        </div>
+      )}
 
       {data.cannibalization.length > 0 && (
         <div className="section card">

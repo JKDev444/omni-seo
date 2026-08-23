@@ -142,3 +142,58 @@ export async function fetchKeywordVolume(
     })),
   };
 }
+
+export interface KeywordIdeaData {
+  keyword: string;
+  searchVolume: number | null;
+  cpc: number | null;
+  competition: number | null;
+  competitionLevel: string | null;
+  difficulty: number | null;
+  intent: string | null;
+}
+
+interface KeywordIdeasItem {
+  keyword: string;
+  keyword_info?: { search_volume?: number; cpc?: number; competition?: number; competition_level?: string };
+  keyword_properties?: { keyword_difficulty?: number };
+  search_intent_info?: { main_intent?: string };
+}
+
+/**
+ * Keyword discovery ("keyword planner") — DataForSEO Labs' keyword_ideas
+ * endpoint, seeded from a batch of real terms (service page titles/H1s,
+ * existing tracked phrases) and returning related keywords the site isn't
+ * necessarily targeting yet, with volume/cpc/competition/difficulty/intent.
+ * Note: this endpoint's location_code is validated against a different,
+ * broader location set than the SERP/rank-check APIs -- a city-level code
+ * that works for checkKeywordRank (e.g. Tumwater, WA) returns "Invalid
+ * Field: location_code" here. Use a state/country-level code (confirmed
+ * working: 2840 = United States).
+ */
+export async function fetchKeywordIdeas(
+  seedKeywords: string[],
+  locationCode: number,
+  languageCode = "en",
+  limit = 100
+): Promise<DataForSeoResult<KeywordIdeaData[]>> {
+  const result = await post<Array<{ items?: KeywordIdeasItem[] }>>("/dataforseo_labs/google/keyword_ideas/live", [
+    { keywords: seedKeywords, location_code: locationCode, language_code: languageCode, limit },
+  ]);
+
+  if (!result.ok) return result;
+
+  const items = result.data?.[0]?.items ?? [];
+  return {
+    ok: true,
+    data: items.map((item) => ({
+      keyword: item.keyword,
+      searchVolume: item.keyword_info?.search_volume ?? null,
+      cpc: item.keyword_info?.cpc ?? null,
+      competition: item.keyword_info?.competition ?? null,
+      competitionLevel: item.keyword_info?.competition_level ?? null,
+      difficulty: item.keyword_properties?.keyword_difficulty ?? null,
+      intent: item.search_intent_info?.main_intent ?? null,
+    })),
+  };
+}

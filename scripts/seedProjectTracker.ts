@@ -130,6 +130,11 @@ const PHASES: PhaseSeed[] = [
     tasks: [
       { title: "DataForSEO SERP rank tracking live", status: DONE },
       { title: "Cannibalization / content decay / CTR opportunity detection", status: DONE },
+      {
+        title: "Keyword discovery (\"keyword planner\") -- new keyword ideas the site doesn't track yet",
+        status: DONE,
+        notes: "DataForSEO Labs keyword_ideas, seeded from real service-page titles/H1s + tracked phrases. Deterministic PURSUE/CONSIDER/SKIP scoring (ICE-style volume/difficulty, same shape as roadmapPlan.ts), weighted down for generic national head terms since Labs volume is national-only and this is a single-location business. Track/Dismiss buttons in-app (lib/actions/keywordIdeaActions.ts) -- also closes the earlier CLI-only add-keyword gap. Runs monthly via GitHub Actions.",
+      },
     ],
   },
   {

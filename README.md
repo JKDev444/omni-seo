@@ -36,7 +36,7 @@ exists for going deep on one specific thing.
 | F | Core Web Vitals (`/performance`) — CrUX field data + PSI lab data | Live (CrUX has no field data for this site — see Known limitations) |
 | G | Internal Link Graph (`/internal-links`) | Live, real data |
 | H | Content Depth / E-E-A-T, LLM-assisted (`/content`) | Live, real data |
-| I | Keyword rank tracking, cannibalization, decay, CTR opportunities (`/keywords`) | Live, real data |
+| I | Keyword rank tracking, cannibalization, decay, CTR opportunities, keyword discovery (`/keywords`) | Live, real data — keyword discovery (`lib/data/keywordDiscovery.ts`) added 2026-08-23: DataForSEO Labs keyword_ideas, seeded from real service-page titles/H1s, scored PURSUE/CONSIDER/SKIP with a deterministic ICE-style formula that discounts generic national head terms (Labs volume is national-only, and this is a single-location business) in favor of realistic or locally-qualified terms. Track/Dismiss buttons in-app also close the earlier CLI-only add-keyword gap |
 | J | Content Stacks / topical authority (`/content-stacks`) | Live, real data |
 | K | Local SEO + GBP performance API | **Skipped for now** — Places API (public GBP data) is live; the separate GBP Performance API (impressions/calls/clicks, review replies) was deliberately not applied for since it's additive, not foundational |
 | L | Backlinks + competitor link gap (`/backlinks`) | Live, real data |
@@ -139,7 +139,7 @@ observed crawl time is 10-25 minutes, which exceeds even that):
   `monthly-seo-sync.yml`): everything too slow or too cost-bearing for a
   serverless function — full crawl, indexation check, Core Web Vitals,
   keyword rank checks (weekly); LLM content review, CTR rewrites,
-  content-stack clustering, backlinks (monthly, since Anthropic/
+  content-stack clustering, backlinks, keyword discovery (monthly, since Anthropic/
   DataForSEO cost real money and this data doesn't meaningfully change
   week to week). GitHub Actions jobs have no comparable timeout.
   **Needs every env var from the list below added as a GitHub repo
@@ -154,7 +154,7 @@ Month / Ongoing plan) · `/dashboard` (health rings, findings, scorecard,
 citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 `/performance` (CWV) · `/internal-links` · `/content` (LLM content
 review) · `/ai-search` (AI Search Readiness) · `/keywords` (rank tracking + cannibalization + decay + CTR
-rewrites) · `/content-stacks` · `/backlinks` · `/reports` (monthly
+rewrites + keyword discovery/opportunities) · `/content-stacks` · `/backlinks` · `/reports` (monthly
 client report) · `/change-log` (every title/meta/canonical/H1/status/
 schema change, crawl over crawl) · `/project-tracker` (phase/task board
 for following this app's own build progress — see Project Tracker
@@ -185,7 +185,7 @@ when the first version tried).
 | PageSpeed Insights + CrUX | `GOOGLE_PAGESPEED_API_KEY` | Core Web Vitals (`/performance`) — same key covers both APIs; both must be enabled in Cloud Console, and the key's API restrictions (if any) must explicitly allow both |
 | Places API (New) | `GOOGLE_PLACES_API_KEY` | Public GBP data (rating, reviews, hours, NAP) — `Site.gbpPlaceId` must be set (real Place ID, look it up via `places:searchText`) |
 | Anthropic (Claude Haiku) | `ANTHROPIC_API_KEY` | Content review (`/content`), CTR rewrite suggestions, content-stack topic clustering — every call here is a real per-request cost |
-| DataForSEO | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | Keyword rank tracking, keyword volume, backlinks — pay-as-you-go, basic auth, real per-request cost |
+| DataForSEO | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | Keyword rank tracking, keyword volume, backlinks, keyword discovery (Labs keyword_ideas) — pay-as-you-go, basic auth, real per-request cost |
 
 `Site.dataForSeoLocationCode` (currently `1027784` = Tumwater, WA) and
 `Site.dataForSeoLanguageCode` control where rank checks are targeted.
@@ -208,6 +208,7 @@ npx tsx scripts/runKeywordRankings.ts [domain]           # live SERP rank check 
 npx tsx scripts/retryFailedRankings.ts [domain]          # retry only keywords with no ranking data yet
 npx tsx scripts/runGbpProfilePull.ts [domain]            # public GBP data via Places API
 npx tsx scripts/runBacklinksCheck.ts [domain] [competitor1,competitor2,...]
+npx tsx scripts/runKeywordDiscovery.ts [domain]          # keyword discovery -- new keyword ideas via DataForSEO Labs, real API cost
 ```
 
 ## Known limitations (real, not bugs)
@@ -446,12 +447,9 @@ they only matter once the app runs unattended:
 - **Core Web Vitals has only 1 stored data point** — expected, given
   the CrUX threshold issue above, but worth knowing before treating
   `/performance` as fully populated.
-- **No keyword *discovery* tool yet** — `/keywords` tracks rank
-  position and pulls search volume for keywords you already added (via
-  `seedKeywords.ts` or suggestions pulled from queries the site already
-  gets impressions for). It does not surface brand-new keyword ideas
-  the site doesn't rank for at all — the actual "which keywords are
-  worth going after" research step SearchAtlas/Semrush/Ahrefs/Google
-  Keyword Planner do. DataForSEO (already integrated) has a Keyword
-  Ideas / related-keywords endpoint that isn't wired up yet — see the
-  walkthrough for the recommendation on this.
+- ~~No keyword *discovery* tool~~ — **built 2026-08-23.** `/keywords`
+  now has a "Keyword opportunities" section surfacing real keyword
+  ideas the site doesn't track yet (DataForSEO Labs, seeded from real
+  service-page titles), scored PURSUE/CONSIDER/SKIP. See the Phase I
+  row above for how the scoring avoids overclaiming on generic
+  national head terms.

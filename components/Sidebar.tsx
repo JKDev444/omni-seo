@@ -33,6 +33,7 @@ const NAV_GROUPS: NavGroup[] = [
     { href: "/deploy-check", label: "Deploy Check" },
   ]},
   { label: "System", items: [
+    { href: "/guide", label: "Field Guide" },
     { href: "/project-tracker", label: "Project Tracker" },
   ]},
 ];

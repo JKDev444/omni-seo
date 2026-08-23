@@ -92,6 +92,7 @@ model Site {
   internalLinks  InternalLink[]
   contentAnalyses ContentAnalysis[]
   keywords    Keyword[]
+  keywordIdeas KeywordIdea[]
   ctrRewriteSuggestions CtrRewriteSuggestion[]
   contentStacks ContentStack[]
   backlinkProfiles BacklinkProfile[]
@@ -559,6 +560,38 @@ model Keyword {
   createdAt    DateTime @default(now())
 
   rankings     KeywordRanking[]
+
+  @@unique([siteId, phrase])
+}
+
+// Keyword discovery ("keyword planner"): candidate keywords the site does
+// NOT already track, surfaced from DataForSEO Labs' keyword_ideas endpoint
+// seeded from real service-page titles/H1s and existing tracked phrases.
+// Deliberately a separate model from Keyword -- an idea is a candidate
+// awaiting a decision (track it or not), not something we're rank-checking.
+enum KeywordIdeaRecommendation {
+  PURSUE
+  CONSIDER
+  SKIP
+}
+
+model KeywordIdea {
+  id               String                    @id @default(cuid())
+  siteId           String
+  site             Site                      @relation(fields: [siteId], references: [id])
+  phrase           String
+  seedKeyword      String?
+  searchVolume     Int?
+  cpc              Float?
+  competition      Float?
+  competitionLevel String?
+  difficulty       Int?
+  intent           String?
+  recommendation   KeywordIdeaRecommendation
+  rationale        String
+  dismissed        Boolean                   @default(false)
+  trackedAsKeywordId String?
+  discoveredAt     DateTime                  @default(now())
 
   @@unique([siteId, phrase])
 }
