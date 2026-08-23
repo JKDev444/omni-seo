@@ -269,11 +269,11 @@ const PHASES: PhaseSeed[] = [
     key: "W",
     name: "AI Chat Assistant",
     summary: "A SearchAtlas-style chat over the site's real findings/action-plan data (\"What are today's tasks?\").",
-    status: ProjectPhaseStatus.NOT_STARTED,
+    status: ProjectPhaseStatus.COMPLETE,
     tasks: [
-      { title: "Design the chat's data access (read-only over Finding/ActionPlan/Scorecard, scoped to the selected site)", status: TODO },
-      { title: "Build the chat UI + Anthropic-backed query handling", status: TODO },
-      { title: "Verify answers stay grounded in real data (no fabricated numbers, same discipline as the Scorecard/Citation fixes)", status: TODO },
+      { title: "Design the chat's data access (read-only over Finding/ActionPlan/Scorecard, scoped to the selected site)", status: DONE, notes: "lib/data/chatContext.ts reuses getActionPlanData/getDashboardData rather than a separate query path -- avoids a second source of truth for the same numbers." },
+      { title: "Build the chat UI + Anthropic-backed query handling", status: DONE, notes: "components/ChatWidget.tsx (floating widget, every page) + lib/integrations/anthropicChat.ts (same direct-fetch pattern as existing LLM integrations)." },
+      { title: "Verify answers stay grounded in real data (no fabricated numbers, same discipline as the Scorecard/Citation fixes)", status: DONE, notes: "Verified live: a factual question (\"how many critical issues\") matched an independently-queried real count exactly (13); an open-ended question (\"what are today's top tasks\") correctly cited real findings and real maintenance tasks; a question outside the digest (backlink trends) was correctly declined rather than fabricated." },
     ],
   },
   {
