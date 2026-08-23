@@ -30,6 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
   { label: "Reports", items: [
     { href: "/reports", label: "Reports" },
     { href: "/change-log", label: "Change Log" },
+    { href: "/deploy-check", label: "Deploy Check" },
   ]},
   { label: "System", items: [
     { href: "/project-tracker", label: "Project Tracker" },

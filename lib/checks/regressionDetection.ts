@@ -13,7 +13,7 @@ import type { RawFinding } from "./onPageChecks";
 
 const SYSTEMIC_THRESHOLD = 3;
 
-interface SnapshotSignal {
+export interface SnapshotSignal {
   url: string;
   statusCode: number | null;
   title: string | null;
@@ -28,7 +28,8 @@ interface Regression {
   type: string; // e.g. "lost meta description", "status code 200 -> 404"
 }
 
-function diffSignals(prev: SnapshotSignal, curr: SnapshotSignal): string[] {
+/** Exported for reuse by the pre-deploy check (Phase R) -- comparing a theme-preview fetch against the current production snapshot is the same "what got worse" question as crawl-over-crawl regression detection, just with a different source for `curr`. */
+export function diffSignals(prev: SnapshotSignal, curr: SnapshotSignal): string[] {
   const regressions: string[] = [];
 
   if (prev.title && !curr.title) regressions.push("lost title tag");

@@ -48,7 +48,7 @@ const MAX_PAGES = 200; // safety ceiling for v1 (single domain)
 // Neither check is meaningful for a legal or confirmation page.
 const UTILITY_PAGE_SLUG_RE = /\/pages\/(privacy-policy|terms-of-use|terms-and-conditions|terms-of-service|cookie-policy|accessibility-statement|refund-policy|shipping-policy|thank-you|appointment-confirmed|order-confirmed|booking-confirmed|covid-19-information|online-booking|[a-z-]*online-profiles)/i;
 
-function classifyPageType(url: string): string {
+export function classifyPageType(url: string): string {
   const path = new URL(url).pathname;
   const segments = path.split("/").filter(Boolean);
   if (path === "/") return "homepage";
