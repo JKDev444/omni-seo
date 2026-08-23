@@ -66,7 +66,7 @@ Once the single-site A-S phase list above is solid, the plan is:
 | T | Multi-Site Support | **Partial** — the architecture is done: `lib/data/activeSite.ts` (cookie-based active-site resolution) replaced every page/data function's hardcoded `V1_DOMAIN`, and a sidebar site switcher (`components/SiteSwitcher.tsx`) appears automatically once more than one site exists. Verified live with a synthetic second site — data isolation, empty-state rendering, and the stale-cookie-after-deletion fallback all confirmed working, then cleaned up. Not done: actually onboarding `esco-pacific.com` as a real second site — needs the user to grant the service account access to Esco's Search Console/GA4 properties first, plus a decision on DataForSEO spend for a second site, before its first real crawl runs |
 | U | UI/UX Design Polish | **Complete** — mocked up two visual directions as a design canvas first (see below), user picked "Spacious & Editorial." Rolled out: bigger radii/shadows and solid-fill priority badges (`styles/tokens.css`), a grouped 6-section sidebar nav with real active-page highlighting for the first time (`components/NavLinks.tsx`), and a structural rebuild of the Action Plan page (elevated finding cards with a priority-colored left border, roadmap tiles with SVG progress rings). Because the shared classes changed, every other page inherited the new look automatically — verified live on Dashboard and Indexation too. Mobile navigation (`components/MobileNavShell.tsx`) adds a hamburger-triggered drawer with the same nav, using plain conditional mounting rather than a slide animation — see Known limitations for why |
 | V | Change Pacing / Drip-Feed Intelligence | **Research done, design paused pending a decision** — see "Change pacing: what the research actually found" below. The premise this phase started from (drip-feed changes/backlinks to avoid an algorithmic penalty) isn't well-supported by Google's own statements, so the design needs to change before building anything |
-| W | AI Chat Assistant | A SearchAtlas-style chat ("What are today's tasks?") over the site's real Finding/Action Plan/Scorecard data. Sequenced last since it's only trustworthy once the underlying data is — which is what the ongoing accuracy audit has been building toward — and cheap to add on top of a stable, multi-site, polished app using the Anthropic integration already in place |
+| W | AI Chat Assistant | **Complete** — a floating chat widget on every page (`components/ChatWidget.tsx`), grounded in a real-data digest built from the same `getActionPlanData`/`getDashboardData` functions every other page uses (`lib/data/chatContext.ts`) — never a second source of truth for the same numbers. Verified live: a factual question matched an independently-queried real count exactly, an open-ended "what are today's top tasks" question correctly cited real findings and real maintenance tasks, and a question outside the digest (backlink trends) was correctly declined instead of fabricated |
 
 Tracked in the Project Tracker (`/project-tracker`) alongside everything else.
 
@@ -148,6 +148,12 @@ client report) · `/change-log` (every title/meta/canonical/H1/status/
 schema change, crawl over crawl) · `/project-tracker` (phase/task board
 for following this app's own build progress — see Project Tracker
 section below) · `/login`
+
+A floating chat widget (`components/ChatWidget.tsx`, `/lib/data/chatContext.ts`)
+is available on every page — ask it things like "What are today's top
+tasks?" or "How many critical issues do I have?" and it answers from
+the same real data every other page shows, declining rather than
+guessing when a question is outside what it has.
 
 The Backlinks, Keywords, and Indexation pages' biggest tables (150, 117,
 182+ rows) use `components/FilterableTable.tsx` — a client-side search
