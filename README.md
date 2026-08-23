@@ -65,10 +65,47 @@ Once the single-site A-S phase list above is solid, the plan is:
 |---|---|---|
 | T | Multi-Site Support | **Partial** — the architecture is done: `lib/data/activeSite.ts` (cookie-based active-site resolution) replaced every page/data function's hardcoded `V1_DOMAIN`, and a sidebar site switcher (`components/SiteSwitcher.tsx`) appears automatically once more than one site exists. Verified live with a synthetic second site — data isolation, empty-state rendering, and the stale-cookie-after-deletion fallback all confirmed working, then cleaned up. Not done: actually onboarding `esco-pacific.com` as a real second site — needs the user to grant the service account access to Esco's Search Console/GA4 properties first, plus a decision on DataForSEO spend for a second site, before its first real crawl runs |
 | U | UI/UX Design Polish | **Complete** — mocked up two visual directions as a design canvas first (see below), user picked "Spacious & Editorial." Rolled out: bigger radii/shadows and solid-fill priority badges (`styles/tokens.css`), a grouped 6-section sidebar nav with real active-page highlighting for the first time (`components/NavLinks.tsx`), and a structural rebuild of the Action Plan page (elevated finding cards with a priority-colored left border, roadmap tiles with SVG progress rings). Because the shared classes changed, every other page inherited the new look automatically — verified live on Dashboard and Indexation too. Mobile navigation (`components/MobileNavShell.tsx`) adds a hamburger-triggered drawer with the same nav, using plain conditional mounting rather than a slide animation — see Known limitations for why |
-| V | Change Pacing / Drip-Feed Intelligence | Real research first (there's no authoritative API for "how fast is too fast" on SEO changes or backlink outreach — this is judgment, not a deterministic check), then a scheduling layer on top of the existing 30/60/90-day roadmap that spaces out *when* Action Plan items get surfaced |
+| V | Change Pacing / Drip-Feed Intelligence | **Research done, design paused pending a decision** — see "Change pacing: what the research actually found" below. The premise this phase started from (drip-feed changes/backlinks to avoid an algorithmic penalty) isn't well-supported by Google's own statements, so the design needs to change before building anything |
 | W | AI Chat Assistant | A SearchAtlas-style chat ("What are today's tasks?") over the site's real Finding/Action Plan/Scorecard data. Sequenced last since it's only trustworthy once the underlying data is — which is what the ongoing accuracy audit has been building toward — and cheap to add on top of a stable, multi-site, polished app using the Anthropic integration already in place |
 
 Tracked in the Project Tracker (`/project-tracker`) alongside everything else.
+
+### Change pacing: what the research actually found
+
+Before designing Phase V, researched what Google itself actually says
+about change/backlink pacing rather than building on assumption:
+
+- **Backlink velocity is explicitly not a ranking factor.** Google's
+  John Mueller: *"it's not so much a matter of how many links you get
+  in which time period... it doesn't really matter how many or in
+  which time."* What matters is whether individual links are natural,
+  not their acquisition pace. The common SEO-industry belief that
+  outreach must be drip-fed to avoid an algorithmic penalty isn't
+  well-supported by Google's own statements.
+- **Mueller's real reason for splitting site changes over time is
+  attribution, not algorithm safety** — *"if you do everything at
+  once, you'll never know what to fix."* That's a measurement problem
+  this app already has strong infrastructure for: the SEO Change
+  Tracking changelog (Phase R, `/change-log`) plus GSC/Scorecard data
+  is exactly what's needed to correlate a change with its effect.
+- **Crawl budget is a real constraint, but overwhelmingly for large
+  sites** — Google's own guidance frames it around sites with very
+  large URL counts or very high publish frequency. At ~182 pages,
+  omnicenters.com isn't in that risk zone.
+- **Google's "scaled content abuse" policy is about volume + low value
+  + manipulative intent, not volume alone** — a large site can publish
+  thousands of genuinely useful pages and be fine. The technical/schema
+  fixes and content-quality improvements this app recommends are
+  improvements to real existing pages, not the mass-produced
+  low-value-page pattern the policy targets.
+
+**Conclusion:** the phase's original framing ("protect against Google
+penalties by drip-feeding") doesn't hold up. The recommended reframe is
+a project-management pacing layer instead — sequencing work for clean
+before/after attribution and realistic execution capacity, not
+algorithm avoidance. This changes the phase's shape enough that it's
+flagged in the Project Tracker's Red Flags phase for a decision before
+any design/build work continues.
 
 ## Automation
 
