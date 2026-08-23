@@ -32,6 +32,17 @@ const SKIPPED = ProjectTaskStatus.SKIPPED;
 
 const PHASES: PhaseSeed[] = [
   {
+    key: "FLAGS",
+    name: "Red Flags — Needs Your Decision",
+    summary: "Things found during autonomous work that need a human call, not something I should decide unilaterally. Check this first.",
+    status: ProjectPhaseStatus.IN_PROGRESS,
+    tasks: [
+      { title: "No mobile navigation — sidebar just disappears below 900px wide, no replacement", status: TODO },
+      { title: "Esco Pacific onboarding blocked on real credentials", status: TODO, notes: "Needs: (1) service account added as a user on Esco's Search Console + GA4 properties, (2) a yes/no on spending real money on a second site's DataForSEO calls, (3) Esco's Google Place ID for GBP/NAP checks. Can't proceed without these." },
+      { title: "Deployment verification gate has no staging environment to diff against", status: TODO, notes: "This app has no staging/preview environment concept -- would need a decision on whether to build one (and how) before this Phase R task is buildable at all." },
+    ],
+  },
+  {
     key: "A",
     name: "Auth",
     summary: "NextAuth Credentials login, no public signup.",
