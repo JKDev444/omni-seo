@@ -39,7 +39,7 @@ const PHASES: PhaseSeed[] = [
     tasks: [
       { title: "No mobile navigation — sidebar just disappears below 900px wide, no replacement", status: DONE, notes: "Fixed with components/MobileNavShell.tsx -- a hamburger-triggered drawer. No slide animation (see README Known limitations for why); functionally verified via real layout measurements." },
       { title: "Esco Pacific onboarding blocked on real credentials", status: TODO, notes: "Needs: (1) service account added as a user on Esco's Search Console + GA4 properties, (2) a yes/no on spending real money on a second site's DataForSEO calls, (3) Esco's Google Place ID for GBP/NAP checks. Can't proceed without these." },
-      { title: "Deployment verification gate has no staging environment to diff against", status: TODO, notes: "This app has no staging/preview environment concept -- would need a decision on whether to build one (and how) before this Phase R task is buildable at all." },
+      { title: "Deployment verification gate has no staging environment to diff against", status: DONE, notes: "Resolved without needing new infrastructure -- Shopify's own theme preview URLs are a real, already-available surface. See Phase R." },
       {
         title: "Phase V premise needs your review: research shows backlink-velocity risk is NOT well-supported by Google",
         status: DONE,
@@ -211,12 +211,16 @@ const PHASES: PhaseSeed[] = [
     key: "R",
     name: "Automation + Regression Detection",
     summary: "Scheduled sync + crawl-to-crawl regression detection.",
-    status: ProjectPhaseStatus.PARTIAL,
+    status: ProjectPhaseStatus.COMPLETE,
     tasks: [
       { title: "Scheduled crawl + data sync automation", status: DONE },
       { title: "Regression detection (title/meta/H1/canonical/schema loss)", status: DONE },
-      { title: "Full SEO change tracking changelog (every field change, not just regressions)", status: TODO },
-      { title: "Deployment verification gate (pre/post-deploy audit diff)", status: TODO },
+      { title: "Full SEO change tracking changelog (every field change, not just regressions)", status: DONE, notes: "lib/checks/changeTracking.ts + /change-log page." },
+      {
+        title: "Deployment verification gate (pre/post-deploy audit diff)",
+        status: DONE,
+        notes: "No staging environment needed after all -- Shopify's own theme preview URLs are a real, already-available surface. lib/checks/preDeployCheck.ts + /deploy-check page fetches a preview URL, runs the same checks a real crawl runs, and diffs against production via the same diffSignals() regression detection already uses.",
+      },
     ],
   },
   {
