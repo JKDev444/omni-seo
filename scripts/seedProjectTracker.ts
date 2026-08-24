@@ -226,6 +226,11 @@ const PHASES: PhaseSeed[] = [
         status: DONE,
         notes: "No staging environment needed after all -- Shopify's own theme preview URLs are a real, already-available surface. lib/checks/preDeployCheck.ts + /deploy-check page fetches a preview URL, runs the same checks a real crawl runs, and diffs against production via the same diffSignals() regression detection already uses.",
       },
+      {
+        title: "In-app trigger for the GitHub Actions weekly/monthly sync (/automation)",
+        status: DONE,
+        notes: "lib/integrations/github.ts calls GitHub's REST API (workflow_dispatch + list runs) with a separate GITHUB_TOKEN the app holds, so a manual run no longer requires opening GitHub's Actions tab. Typechecked and the no-token empty state verified live; the actual dispatch call itself is unverified until a real GITHUB_TOKEN is set (needs the user to create one).",
+      },
     ],
   },
   {

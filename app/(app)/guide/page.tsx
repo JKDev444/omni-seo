@@ -30,6 +30,7 @@ const PAGE_REFERENCE: { path: string; when: string }[] = [
   { path: "/reports", when: "The monthly written summary for a stakeholder." },
   { path: "/change-log", when: "Something looks off and you want to know exactly what changed, and when." },
   { path: "/deploy-check", when: "Before publishing any Shopify theme change — see Common tasks below." },
+  { path: "/automation", when: "Running the weekly or monthly sync right now instead of waiting for its schedule." },
   { path: "/project-tracker", when: "What's been built into this tool itself, and what hasn't." },
 ];
 
@@ -172,10 +173,21 @@ export default function GuidePage() {
         </Callout>
         <ol style={{ paddingLeft: "var(--space-5)", lineHeight: 2 }}>
           <li><strong>Add 7 secrets to GitHub</strong> — Repo → Settings → Secrets and variables → Actions. Copy the same 7 values already in your local <code>.env</code>: <code>DATABASE_URL</code>, <code>ANTHROPIC_API_KEY</code>, <code>DATAFORSEO_LOGIN</code>, <code>DATAFORSEO_PASSWORD</code>, <code>GOOGLE_SERVICE_ACCOUNT_KEY</code>, <code>GOOGLE_PAGESPEED_API_KEY</code>, <code>GOOGLE_PLACES_API_KEY</code>.</li>
-          <li><strong>Trigger the weekly workflow manually once</strong> — GitHub → Actions tab → &quot;Weekly SEO Sync&quot; → Run workflow. Confirm it finishes green.</li>
-          <li><strong>Trigger the monthly workflow manually once</strong> — same tab → &quot;Monthly SEO Sync&quot; → Run workflow.</li>
+          <li><strong>Trigger the weekly workflow manually once</strong> — from <strong>Automation</strong> in the sidebar (set up its <code>GITHUB_TOKEN</code> once via that page&apos;s instructions), or from GitHub&apos;s Actions tab → &quot;Weekly SEO Sync&quot; → Run workflow. Confirm it finishes green.</li>
+          <li><strong>Trigger the monthly workflow manually once</strong> — same place, &quot;Monthly SEO Sync&quot;. This one spends real Anthropic + DataForSEO money, so once is enough to confirm it works.</li>
           <li><strong>Confirm <code>CRON_SECRET</code> is set in Vercel</strong> — Vercel project → Settings → Environment Variables.</li>
         </ol>
+      </div>
+
+      <div className="section card">
+        <h2 className="card-title">Running a sync on demand</h2>
+        <p>
+          Open <strong>Automation</strong> in the sidebar. If it asks for a one-time <code>GITHUB_TOKEN</code>
+          setup, follow the steps shown there (it&apos;s a separate credential from the 7 GitHub secrets above —
+          this one lets the app itself call GitHub&apos;s API instead of you opening GitHub). Once set up, click{" "}
+          <strong>Run now</strong> next to either sync and watch the run show up in the list below it — no need to
+          leave the app.
+        </p>
       </div>
 
       <div className="section card">

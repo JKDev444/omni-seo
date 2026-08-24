@@ -145,8 +145,8 @@ observed crawl time is 10-25 minutes, which exceeds even that):
   **Needs every env var from the list below added as a GitHub repo
   secret** (Settings → Secrets and variables → Actions) — the workflows
   read them via `${{ secrets.NAME }}`. Trigger a run manually anytime
-  from the Actions tab (`workflow_dispatch`) without waiting for the
-  schedule.
+  from the Actions tab (`workflow_dispatch`), or from `/automation` in
+  the app itself (see below) without leaving it.
 
 ## Pages in the app
 `/action-plan` (post-login landing page — the unified Do Now / This
@@ -156,7 +156,10 @@ citations, maintenance) · `/analytics` (GSC+GA4) · `/indexation` ·
 review) · `/ai-search` (AI Search Readiness) · `/keywords` (rank tracking + cannibalization + decay + CTR
 rewrites + keyword discovery/opportunities) · `/content-stacks` · `/backlinks` · `/reports` (monthly
 client report) · `/change-log` (every title/meta/canonical/H1/status/
-schema change, crawl over crawl) · `/project-tracker` (phase/task board
+schema change, crawl over crawl) · `/automation` (trigger/check the
+GitHub Actions weekly/monthly sync without leaving the app — see
+Automation above) · `/guide` (in-app Field Guide — day-to-day
+walkthrough) · `/project-tracker` (phase/task board
 for following this app's own build progress — see Project Tracker
 section below) · `/login`
 
@@ -411,6 +414,8 @@ GOOGLE_SERVICE_ACCOUNT_KEY=
 GOOGLE_PAGESPEED_API_KEY=
 GOOGLE_PLACES_API_KEY=
 CRON_SECRET=
+GITHUB_TOKEN=
+GITHUB_REPO=
 ```
 All of the above must also be set in Vercel's project environment
 variables for production, separately from local `.env`. The two GitHub
@@ -418,8 +423,13 @@ Actions workflows need `DATABASE_URL`, `ANTHROPIC_API_KEY`,
 `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`, `GOOGLE_SERVICE_ACCOUNT_KEY`,
 `GOOGLE_PAGESPEED_API_KEY`, and `GOOGLE_PLACES_API_KEY` added as GitHub
 repo secrets too (they write directly to the same production database —
-`NEXTAUTH_*` and `CRON_SECRET` aren't needed there, since the workflows
-don't touch auth or the Vercel Cron route).
+`NEXTAUTH_*`, `CRON_SECRET`, and `GITHUB_TOKEN`/`GITHUB_REPO` aren't
+needed there, since the workflows don't touch auth, the Vercel Cron
+route, or GitHub's own API). `GITHUB_TOKEN`/`GITHUB_REPO` are the
+reverse direction — a fine-grained PAT the *app* uses to call GitHub's
+API from `/automation`, only needed in Vercel (and locally if you want
+that page to work in dev). See `/automation`'s empty state for the
+exact token setup steps.
 
 ## Deployment
 - Push to `main` → Vercel auto-deploys.
@@ -461,9 +471,15 @@ they only matter once the app runs unattended:
   way to check which from outside GitHub's own settings page.
   **Action needed:** add the 7 secrets listed above to GitHub (Settings
   → Secrets and variables → Actions), then trigger each workflow once
-  manually from the Actions tab (`workflow_dispatch`) and confirm it
-  finishes green. Do this once before trusting the Monday/1st-of-month
-  schedule.
+  and confirm it finishes green — either from GitHub's Actions tab
+  (`workflow_dispatch`) or from `/automation` in the app itself (needs
+  its own one-time `GITHUB_TOKEN` setup, separate from the 7 secrets —
+  see that page's empty state). Do this once before trusting the
+  Monday/1st-of-month schedule. Note: as of 2026-08-24 the app-side
+  trigger button has been typechecked and its no-token empty state
+  verified live, but the actual GitHub API call it makes has not been
+  exercised end-to-end yet (needs a real `GITHUB_TOKEN` to test) — the
+  Actions-tab route is the proven path until that's done once.
 - **Keyword discovery's real cost**: DataForSEO's published price for
   the Labs `keyword_ideas` endpoint is $0.012 per request plus $0.00012
   per keyword returned ([DataForSEO Labs vs Google Ads API help
